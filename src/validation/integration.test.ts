@@ -308,6 +308,43 @@ describe('standings & podium (simulated scores)', () => {
     expect(podium?.[0]?.sideIds).toContain(p1);
   });
 
+  it('doubles fixed round robin: team standings and labels', () => {
+    const players = mockPlayers(4);
+    const teams = autoPairPlayers(players);
+    const { matches } = buildRoundRobinSchedule(
+      players,
+      teams,
+      'doubles',
+      'sequential',
+      'fixed',
+    );
+    const teamKey = [...teams[0].playerIds].sort().join(',');
+    const scored = matches.map((m) =>
+      m.sideAIds.includes(teams[0].playerIds[0]) ||
+      m.sideAIds.includes(teams[0].playerIds[1])
+        ? withBo1Win(m, 'A')
+        : withBo1Win(m, 'B'),
+    );
+    const t = baseTournament({
+      mode: 'doubles',
+      doublesPairing: 'fixed',
+      players,
+      teams,
+      matches: scored,
+      bestOf: 1,
+    });
+    const standings = computeStandings(
+      'doubles',
+      t.players,
+      t.teams,
+      t.matches,
+      t,
+    );
+    expect(standings[0]?.id).toBe(teamKey);
+    expect(standings[0]?.wins).toBe(1);
+    expect(standings[0]?.played).toBe(1);
+  });
+
   it('women category hides gender in labels', () => {
     expect(showPlayerGender('women')).toBe(false);
     const normalized = normalizePlayersForCategory(

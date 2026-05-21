@@ -56,12 +56,21 @@ function entityKey(ids: string[]): string {
   return [...ids].sort().join(',');
 }
 
-function isDoublesPartnerRoundRobin(t: StandingTournamentFields): boolean {
+/** 循环赛轮换搭档：排名按球员；固定队友及其他赛制按队伍 */
+export function usesPlayerStandings(
+  mode: MatchMode,
+  tournament: Pick<StandingTournamentFields, 'scheduleFormat' | 'doublesPairing'>,
+): boolean {
   return (
-    t.mode === 'doubles' &&
-    t.scheduleFormat === 'round_robin' &&
-    t.doublesPairing === 'rotating'
+    mode === 'singles' ||
+    (mode === 'doubles' &&
+      tournament.scheduleFormat === 'round_robin' &&
+      tournament.doublesPairing === 'rotating')
   );
+}
+
+function isDoublesPartnerRoundRobin(t: StandingTournamentFields): boolean {
+  return usesPlayerStandings(t.mode, t);
 }
 
 function buildEntities(
@@ -125,6 +134,27 @@ function headToHeadWins(
     if (!isPair) continue;
     const aWon =
       keyA === entityA ? m.scoreA > m.scoreB : m.scoreB > m.scoreA;
+    if (aWon) wins++;
+  }
+  return wins;
+}
+
+/** 双打按球员排名时：统计两人作为对手直接交锋的胜场 */
+function headToHeadPlayerWins(
+  matches: Match[],
+  playerA: string,
+  playerB: string,
+): number {
+  let wins = 0;
+  for (const m of matches) {
+    if (m.isBye) continue;
+    if (m.scoreA === null || m.scoreB === null) continue;
+    const aOnA = m.sideAIds.includes(playerA);
+    const aOnB = m.sideBIds.includes(playerA);
+    const bOnA = m.sideAIds.includes(playerB);
+    const bOnB = m.sideBIds.includes(playerB);
+    if (!((aOnA && bOnB) || (aOnB && bOnA))) continue;
+    const aWon = aOnA ? m.scoreA > m.scoreB : m.scoreB > m.scoreA;
     if (aWon) wins++;
   }
   return wins;
@@ -274,7 +304,9 @@ function applyMatchToStats(
 function finalizeStandingRows(
   stats: Map<string, EntityStats>,
   relevant: Match[],
+  tournament: StandingTournamentFields,
 ): StandingRow[] {
+  const byPlayer = usesPlayerStandings(tournament.mode, tournament);
   const rows = [...stats.values()].map((s) => ({
     id: s.id,
     label: s.label,
@@ -289,22 +321,33 @@ function finalizeStandingRows(
   }));
 
   rows.sort((x, y) => {
-    if (y.wins !== x.wins) return y.wins - x.wins;
-    if (y.gameDiff !== x.gameDiff) return y.gameDiff - x.gameDiff;
-    if (y.gamesFor !== x.gamesFor) return y.gamesFor - x.gamesFor;
-    const h2h = headToHeadWins(relevant, x.id, y.id);
-    if (h2h !== 0) return h2h > 0 ? -1 : 1;
+    if (byPlayer) {
+      if (y.gameDiff !== x.gameDiff) return y.gameDiff - x.gameDiff;
+      if (y.wins !== x.wins) return y.wins - x.wins;
+      if (y.gamesFor !== x.gamesFor) return y.gamesFor - x.gamesFor;
+      const h2h = headToHeadPlayerWins(relevant, x.id, y.id);
+      if (h2h !== 0) return h2h > 0 ? -1 : 1;
+    } else {
+      if (y.wins !== x.wins) return y.wins - x.wins;
+      if (y.gameDiff !== x.gameDiff) return y.gameDiff - x.gameDiff;
+      if (y.gamesFor !== x.gamesFor) return y.gamesFor - x.gamesFor;
+      const h2h = headToHeadWins(relevant, x.id, y.id);
+      if (h2h !== 0) return h2h > 0 ? -1 : 1;
+    }
     return x.label.localeCompare(y.label, 'zh-CN');
   });
 
   let rank = 1;
   for (let i = 0; i < rows.length; i++) {
-    if (
+    const tiedWithPrev =
       i > 0 &&
-      rows[i].wins === rows[i - 1].wins &&
-      rows[i].gameDiff === rows[i - 1].gameDiff &&
-      rows[i].gamesFor === rows[i - 1].gamesFor
-    ) {
+      rows[i].gamesFor === rows[i - 1].gamesFor &&
+      (byPlayer
+        ? rows[i].gameDiff === rows[i - 1].gameDiff &&
+          rows[i].wins === rows[i - 1].wins
+        : rows[i].wins === rows[i - 1].wins &&
+          rows[i].gameDiff === rows[i - 1].gameDiff);
+    if (tiedWithPrev) {
       rows[i].rank = rows[i - 1].rank;
     } else {
       rows[i].rank = rank;
@@ -337,7 +380,7 @@ export function computeGroupAndKnockoutStandings(
   for (const m of relevant) {
     applyMatchToStats(stats, m, tournament);
   }
-  return finalizeStandingRows(stats, relevant);
+  return finalizeStandingRows(stats, relevant, tournament);
 }
 
 export function computeStandings(
@@ -357,7 +400,7 @@ export function computeStandings(
     applyMatchToStats(stats, m, tournament);
   }
 
-  return finalizeStandingRows(stats, relevant);
+  return finalizeStandingRows(stats, relevant, tournament);
 }
 
 export function formatMatchSides(

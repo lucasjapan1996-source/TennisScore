@@ -1,5 +1,6 @@
 import { Fragment, type ReactNode } from 'react';
-import type { MatchMode, Player, Team } from '../types';
+import type { MatchMode, Player, ScheduleFormat, Team, DoublesPairing } from '../types';
+import { usesPlayerStandings } from '../utils/ranking';
 import { getActiveStrings } from '../i18n';
 import { useStrings } from '../hooks/useStrings';
 import { GenderSymbol } from './GenderSymbol';
@@ -83,9 +84,17 @@ export function renderStandingName(
   mode: MatchMode,
   teams: Team[] = [],
   showGender = true,
+  standingContext?: {
+    scheduleFormat: ScheduleFormat;
+    doublesPairing: DoublesPairing;
+  },
 ): ReactNode {
   const S = getActiveStrings();
-  if (mode === 'singles') {
+  if (
+    mode === 'singles' ||
+    (standingContext &&
+      usesPlayerStandings(mode, standingContext))
+  ) {
     const p = players.find((pl) => pl.id === entityId);
     return p ? (
       <PlayerLabel player={p} showLevel showGender={showGender} />
@@ -97,7 +106,24 @@ export function renderStandingName(
   const team = teams.find(
     (t) => t.id === entityId || entityKey(t.playerIds) === entityId,
   );
-  if (!team) return entityId;
+  if (!team) {
+    if (entityId.includes(',')) {
+      return entityId.split(',').map((pid, i) => {
+        const p = players.find((pl) => pl.id === pid);
+        return (
+          <Fragment key={pid}>
+            {i > 0 && ' / '}
+            {p ? (
+              <PlayerLabel player={p} compact showGender={showGender} />
+            ) : (
+              pid
+            )}
+          </Fragment>
+        );
+      });
+    }
+    return entityId;
+  }
 
   return team.playerIds.map((pid, i) => {
     const p = players.find((pl) => pl.id === pid);

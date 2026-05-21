@@ -2,7 +2,7 @@ import type { Match, Tournament } from '../types';
 import { resolveMatchBestOf } from './bestOf';
 import { resolveMatchSides, type ResolveSidesTournament } from './knockout';
 import { getMatchWinnerSide } from './matchOutcome';
-import { computeStandings } from './ranking';
+import { computeStandings, usesPlayerStandings } from './ranking';
 import { formatSideCompactLabel } from './player';
 import { showPlayerGender } from './tournamentCategory';
 import { isMatchPlayed } from './score';
@@ -80,7 +80,7 @@ function computeRoundRobinPodium(tournament: Tournament): PodiumPlace[] | null {
     const idx = row.rank - 1;
     if (idx < 0 || idx > 1) continue;
     let sideIds: string[];
-    if (tournament.mode === 'singles') {
+    if (usesPlayerStandings(tournament.mode, tournament)) {
       sideIds = [row.id];
     } else {
       const team = tournament.teams.find(

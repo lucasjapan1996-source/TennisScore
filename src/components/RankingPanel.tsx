@@ -10,7 +10,8 @@ import { withoutThirdPlaceMatches } from '../utils/schedule';
 import { PodiumDisplay } from './PodiumDisplay';
 import { renderStandingName } from './PlayerLabel';
 import { useStrings } from '../hooks/useStrings';
-import type { MatchMode, Player, StandingRow, Team } from '../types';
+import type { DoublesPairing, MatchMode, Player, ScheduleFormat, StandingRow, Team } from '../types';
+import { usesPlayerStandings } from '../utils/ranking';
 import { showPlayerGender } from '../utils/tournamentCategory';
 import { CollapsiblePanel } from './CollapsiblePanel';
 
@@ -20,6 +21,7 @@ export function RankingPanel() {
   const isGroupStage = tournament.scheduleFormat === 'group_stage';
   const isKnockoutOnly = tournament.scheduleFormat === 'knockout';
   const isSingles = tournament.mode === 'singles';
+  const rankByPlayer = usesPlayerStandings(tournament.mode, tournament);
   const genderVisible = showPlayerGender(tournament.category);
   const categoryLabel =
     tournament.category === 'women'
@@ -156,10 +158,12 @@ export function RankingPanel() {
           ) : (
             <StandingsTable
               rows={combinedStandings}
-              isSingles={isSingles}
+              rankByPlayer={rankByPlayer}
               players={tournament.players}
               teams={tournament.teams}
               mode={tournament.mode}
+              scheduleFormat={tournament.scheduleFormat}
+              doublesPairing={tournament.doublesPairing}
               showGender={genderVisible}
             />
           )}
@@ -174,10 +178,12 @@ export function RankingPanel() {
         <CollapsiblePanel title={S.ranking} titleTitle={S.rankingTitle}>
           <StandingsTable
             rows={roundRobinStandings}
-            isSingles={isSingles}
+            rankByPlayer={rankByPlayer}
             players={tournament.players}
             teams={tournament.teams}
             mode={tournament.mode}
+            scheduleFormat={tournament.scheduleFormat}
+            doublesPairing={tournament.doublesPairing}
             showGender={genderVisible}
           />
         </CollapsiblePanel>
@@ -188,17 +194,21 @@ export function RankingPanel() {
 
 function StandingsTable({
   rows,
-  isSingles,
+  rankByPlayer,
   players,
   teams,
   mode,
+  scheduleFormat,
+  doublesPairing,
   showGender,
 }: {
   rows: StandingRow[];
-  isSingles: boolean;
+  rankByPlayer: boolean;
   players: Player[];
   teams: Team[];
   mode: MatchMode;
+  scheduleFormat: ScheduleFormat;
+  doublesPairing: DoublesPairing;
   showGender: boolean;
 }) {
   const S = useStrings();
@@ -210,8 +220,8 @@ function StandingsTable({
             <th className="num" title={S.colRank}>
               {S.colRank}
             </th>
-            <th title={isSingles ? S.colPlayer : S.colTeam}>
-              {isSingles ? S.colPlayer : S.colTeam}
+            <th title={rankByPlayer ? S.colPlayer : S.colTeam}>
+              {rankByPlayer ? S.colPlayer : S.colTeam}
             </th>
             <th className="num" title={S.colDiff}>
               {S.colDiff}
@@ -233,7 +243,12 @@ function StandingsTable({
                   {row.rank}
                 </span>
               </td>
-              <td>{renderStandingName(row.id, players, mode, teams, showGender)}</td>
+              <td>
+                {renderStandingName(row.id, players, mode, teams, showGender, {
+                  scheduleFormat,
+                  doublesPairing,
+                })}
+              </td>
               <td className="num diff-cell">
                 {row.gameDiff > 0 ? '+' : ''}
                 {row.gameDiff}

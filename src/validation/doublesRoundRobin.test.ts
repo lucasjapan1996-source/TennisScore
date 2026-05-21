@@ -81,6 +81,37 @@ describe('doubles partner round robin', () => {
     expect(standings.every((r) => r.played > 0)).toBe(true);
   });
 
+  it('rotating standings sort by game diff first', () => {
+    const players = mockPlayers(4);
+    const { matches } = buildRoundRobinSchedule(
+      players,
+      [],
+      'doubles',
+      'sequential',
+      'rotating',
+    );
+    const finished = matches.map((m, i) => ({
+      ...m,
+      scoreA: i === 0 ? 6 : 4,
+      scoreB: i === 0 ? 4 : 6,
+    }));
+    const standings = computeStandings('doubles', players, [], finished, {
+      mode: 'doubles',
+      doublesPairing: 'rotating',
+      scheduleFormat: 'round_robin',
+      category: 'men',
+      bestOfMode: 'uniform',
+      bestOf: 1,
+      customBestOfDefault: 1,
+      customBestOfFinal: 1,
+    });
+    for (let i = 1; i < standings.length; i++) {
+      expect(standings[i - 1].gameDiff).toBeGreaterThanOrEqual(
+        standings[i].gameDiff,
+      );
+    }
+  });
+
   it('buildDoublesPartnerRoundRobinMatches assigns order', () => {
     const ids = ['p1', 'p2', 'p3', 'p4'];
     const orders: number[] = [];
