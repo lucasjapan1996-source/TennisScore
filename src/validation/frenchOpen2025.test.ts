@@ -35,6 +35,7 @@ function baseTournament(matches: Match[], players: Player[] = PLAYERS): Tourname
     description: '',
     category: 'men',
     mode: 'singles',
+    doublesPairing: 'fixed',
     scheduleFormat: 'knockout',
     scheduleSeedMode: 'sequential',
     bestOfMode: 'uniform',

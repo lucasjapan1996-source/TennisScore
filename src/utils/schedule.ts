@@ -1,4 +1,5 @@
 import type {
+  DoublesPairing,
   GroupAssignment,
   Match,
   MatchMode,
@@ -15,6 +16,10 @@ import {
   nextPowerOfTwo,
 } from './knockout';
 import { getActiveStrings } from '../i18n';
+import {
+  buildDoublesPartnerRoundRobinMatches,
+  countDoublesPartnerRoundMatches,
+} from './doublesRoundRobin';
 
 function uid(): string {
   return crypto.randomUUID();
@@ -178,11 +183,20 @@ function buildMatchesFromPairings<T>(
   return { matches, nextOrder: order };
 }
 
+/** 轮换搭档：按签位顺序或随机打乱后相邻两人一队 */
+export function buildDoublesTeamsFromPlayers(
+  players: Player[],
+  seedMode: ScheduleSeedMode,
+): Team[] {
+  return autoPairPlayers(orderEntities(players, seedMode));
+}
+
 export function buildRoundRobinSchedule(
   players: Player[],
   teams: Team[],
   mode: MatchMode,
   seedMode: ScheduleSeedMode = 'random',
+  doublesPairing: DoublesPairing = 'fixed',
 ): ScheduleResult {
   if (mode === 'singles') {
     const ordered = orderEntities(players, seedMode);
@@ -197,8 +211,18 @@ export function buildRoundRobinSchedule(
     return { matches, groups: [] };
   }
 
-  const ordered = orderEntities(teams, seedMode);
-  const pairings = allPairings(ordered);
+  if (doublesPairing === 'rotating') {
+    const orderedIds = orderEntities(players, seedMode).map((p) => p.id);
+    const matches = buildDoublesPartnerRoundRobinMatches(
+      orderedIds,
+      (order, sideAIds, sideBIds) =>
+        emptyRoundRobinMatch(order, sideAIds, sideBIds),
+    );
+    return { matches, groups: [] };
+  }
+
+  const orderedTeams = orderEntities(teams, seedMode);
+  const pairings = allPairings(orderedTeams);
   const matchOrder = orderPairingsNoBackToBack(pairings, (t) => t.id);
   const { matches } = buildMatchesFromPairings(
     matchOrder,
@@ -269,12 +293,24 @@ export function estimateMatchCount(
   entityCount: number,
   scheduleFormat: ScheduleFormat,
   groupCount: number,
+  options?: {
+    mode?: MatchMode;
+    playerCount?: number;
+    doublesPairing?: DoublesPairing;
+  },
 ): number {
   if (entityCount < 2) return 0;
   if (scheduleFormat === 'knockout') {
     return countPureKnockoutMatches(entityCount);
   }
   if (scheduleFormat === 'round_robin') {
+    if (
+      options?.mode === 'doubles' &&
+      options.doublesPairing === 'rotating'
+    ) {
+      const n = options.playerCount ?? entityCount * 2;
+      return countDoublesPartnerRoundMatches(n);
+    }
     return (entityCount * (entityCount - 1)) / 2;
   }
   const base = Math.floor(entityCount / groupCount);
@@ -347,19 +383,101 @@ export function autoPairPlayers(players: Player[]): Team[] {
   return teams;
 }
 
+/**
+ * 修改一队搭档后，其余队伍自动用剩余球员按列表顺序重新配对。
+ * 例：原 1+2 / 3+4，改为 1+3 后 → 2+4。
+ */
+export function applyTeamPairChange(
+  teams: Team[],
+  teamIndex: number,
+  playerAId: string,
+  playerBId: string,
+  playerOrder: string[],
+): Team[] {
+  if (
+    playerAId === playerBId ||
+    teamIndex < 0 ||
+    teamIndex >= teams.length
+  ) {
+    return teams;
+  }
+
+  const result = teams.map((t) => ({
+    ...t,
+    playerIds: [...t.playerIds] as [string, string],
+  }));
+
+  result[teamIndex] = {
+    ...result[teamIndex],
+    playerIds: [playerAId, playerBId],
+  };
+
+  const locked = new Set([playerAId, playerBId]);
+  const pool: string[] = [];
+
+  for (let i = 0; i < result.length; i++) {
+    if (i === teamIndex) continue;
+    const [p0, p1] = result[i].playerIds;
+    if (locked.has(p0) || locked.has(p1)) {
+      if (!locked.has(p0)) pool.push(p0);
+      if (!locked.has(p1)) pool.push(p1);
+      result[i].playerIds = ['', ''];
+    }
+  }
+
+  const assigned = new Set<string>();
+  for (const t of result) {
+    for (const id of t.playerIds) {
+      if (id) assigned.add(id);
+    }
+  }
+  for (const id of playerOrder) {
+    if (!assigned.has(id)) pool.push(id);
+  }
+
+  const sortedPool = [...new Set(pool)].sort(
+    (a, b) => playerOrder.indexOf(a) - playerOrder.indexOf(b),
+  );
+
+  let cursor = 0;
+  for (let i = 0; i < result.length; i++) {
+    if (i === teamIndex) continue;
+    const [p0, p1] = result[i].playerIds;
+    if (!p0 || !p1 || locked.has(p0) || locked.has(p1)) {
+      const nextA = sortedPool[cursor++];
+      const nextB = sortedPool[cursor++];
+      if (nextA && nextB) {
+        result[i].playerIds = [nextA, nextB];
+      }
+    }
+  }
+
+  return result;
+}
+
 export function validateBeforeSchedule(
   mode: MatchMode,
   players: Player[],
   teams: Team[],
   scheduleFormat: ScheduleFormat,
   groupCount: number,
+  doublesPairing: DoublesPairing = 'fixed',
 ): string | null {
   if (players.length < 2) return getActiveStrings().errMinPlayers;
   if (mode === 'doubles') {
     if (players.length % 2 !== 0) return getActiveStrings().errDoublesEven;
-    if (teams.length < 2) return getActiveStrings().errMinTeams;
-    const used = new Set(teams.flatMap((t) => t.playerIds));
-    if (used.size !== players.length) return getActiveStrings().errTeamCoverage;
+    if (doublesPairing === 'rotating') {
+      if (scheduleFormat === 'round_robin' && players.length < 4) {
+        return getActiveStrings().errDoublesPartnerMin;
+      }
+      if (scheduleFormat !== 'round_robin' && players.length < 4) {
+        return getActiveStrings().errDoublesPartnerMin;
+      }
+    } else {
+      if (teams.length < 2) return getActiveStrings().errMinTeams;
+      const used = new Set(teams.flatMap((t) => t.playerIds));
+      if (used.size !== players.length) return getActiveStrings().errTeamCoverage;
+    }
   }
   if (scheduleFormat === 'group_stage') {
     const entityCount = mode === 'singles' ? players.length : teams.length;

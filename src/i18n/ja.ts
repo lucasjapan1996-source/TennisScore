@@ -78,7 +78,15 @@ export const jaStrings: Strings = {
   singles: 'シングルス',
   singlesTitle: '全員が総当たりで対戦',
   doubles: 'ダブルス',
-  doublesTitle: '2名1組のペアで総当たり',
+  doublesTitle: 'ダブルス：固定ペアかローテーションペアを選択',
+  doublesPairing: 'ペア方式',
+  doublesPairingTitle:
+    '固定は手動編成。ローテーションは下の签位で順番／ランダムに自動ペア',
+  doublesPairingFixed: '固定ペア',
+  doublesPairingFixedTitle: '2名ずつ手動でペア編成し、総当たり／グループ／KO',
+  doublesPairingRotating: 'ローテーション',
+  doublesPairingRotatingTitle:
+    '編成不要。リーグ戦は全員と一度ペア。他方式は签位で自動ペア',
   teamGroupTitle: '各ペアに2名を割り当て（重複不可）',
   teamGroup: 'ダブルス編成',
   teamGroupHint: '手動で変更、または自動ペアリング',
@@ -302,6 +310,7 @@ export const jaStrings: Strings = {
 
   errMinPlayers: '選手は2名以上必要です',
   errDoublesEven: 'ダブルスは偶数名必要です',
+  errDoublesPartnerMin: 'ダブルスリーグ戦は4名以上必要です',
   errMinTeams: 'ペアは2組以上必要です',
   errTeamCoverage: '各選手は1ペアのみ所属',
   errMinGroups: 'グループは2以上',

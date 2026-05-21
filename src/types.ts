@@ -1,5 +1,8 @@
 export type MatchMode = 'singles' | 'doubles';
 
+/** 双打搭档：固定队伍，或轮换/自动配对 */
+export type DoublesPairing = 'fixed' | 'rotating';
+
 /** 赛事类别：男子 / 女子 / 混合（仅混合赛录入与展示性别） */
 export type TournamentCategory = 'men' | 'women' | 'mixed';
 
@@ -98,6 +101,8 @@ export interface Tournament {
   description: string;
   category: TournamentCategory;
   mode: MatchMode;
+  /** 双打时：固定队友可手动编组；轮换搭档则按签位自动/随机配对 */
+  doublesPairing: DoublesPairing;
   scheduleFormat: ScheduleFormat;
   /** 生成对阵：按球员列表顺序，或随机打乱 */
   scheduleSeedMode: ScheduleSeedMode;
@@ -139,6 +144,7 @@ export const DEFAULT_PLAYER_LEVEL: PlayerLevel = 3;
 
 export const DEFAULT_GROUP_COUNT = 2;
 export const DEFAULT_SCHEDULE_SEED_MODE: ScheduleSeedMode = 'random';
+export const DEFAULT_DOUBLES_PAIRING: DoublesPairing = 'fixed';
 
 export const DEFAULT_BEST_OF: BestOf = 1;
 export const DEFAULT_BEST_OF_MODE: BestOfMode = 'uniform';

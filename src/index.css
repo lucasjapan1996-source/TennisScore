@@ -1405,8 +1405,7 @@ select.gender-select-unspecified {
   width: 100%;
   max-width: 100%;
   background: var(--bg);
-  padding-bottom: constant(safe-area-inset-bottom);
-  padding-bottom: var(--safe-bottom-chrome);
+  padding-bottom: 0;
   box-shadow: 0 -1px 0 color-mix(in srgb, var(--border) 50%, transparent);
 }
 
@@ -1417,8 +1416,8 @@ select.gender-select-unspecified {
   width: 100%;
   max-width: 100%;
   touch-action: manipulation;
-  padding: 0.26rem calc(0.4rem + var(--safe-right)) 0.06rem
-    calc(0.4rem + var(--safe-left));
+  padding: 0.22rem calc(0.4rem + var(--safe-right))
+    calc(0.04rem + var(--safe-bottom-chrome)) calc(0.4rem + var(--safe-left));
   background: var(--tab-bar-bg);
   border-top: none;
   box-shadow: none;
@@ -2129,14 +2128,16 @@ p.row + p,
   }
 }
 
-/* iOS「添加到主屏幕」PWA：贴底、压低高度、图标下移 */
+/* iOS「添加到主屏幕」PWA：贴底、保留版权行、仅保留 Home 条安全区 */
 @media (display-mode: standalone) {
   :root {
-    --tab-row-h: 1.72rem;
-    --footer-h: 0;
-    --tab-icon-size: 1.22rem;
-    --safe-bottom-chrome: 0.35rem;
-    --chrome-bottom-h: calc(var(--tab-row-h) + var(--safe-bottom-chrome));
+    --tab-row-h: 1.38rem;
+    --footer-h: 0.72rem;
+    --tab-icon-size: 1.05rem;
+    --safe-bottom-chrome: env(safe-area-inset-bottom, 0px);
+    --chrome-bottom-h: calc(
+      var(--footer-h) + var(--tab-row-h) + var(--safe-bottom-chrome)
+    );
   }
 
   html {
@@ -2159,7 +2160,19 @@ p.row + p,
   }
 
   .app-footer {
-    display: none;
+    display: block;
+    padding: 0.04rem calc(0.45rem + var(--safe-right)) 0.03rem
+      calc(0.45rem + var(--safe-left));
+    font-size: 0.42rem;
+    line-height: 1.15;
+  }
+
+  .app-footer p {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
 
   .app-bottom-chrome {
@@ -2170,16 +2183,21 @@ p.row + p,
     width: min(100%, 560px);
     transform: translateX(-50%);
     background: var(--bg);
-    padding-bottom: var(--safe-bottom-chrome);
+    padding-bottom: 0;
   }
 
   .tab-bar {
-    padding-top: 0.2rem;
-    padding-bottom: 0.04rem;
+    padding-top: 0.1rem;
+    padding-bottom: var(--safe-bottom-chrome);
   }
 
   .tab-bar button {
-    padding: 0.02rem 0.08rem 0.14rem;
+    padding: 0 0.06rem 0.06rem;
+    gap: 0.02rem;
+  }
+
+  .tab-bar button .tab-label {
+    font-size: 0.54rem;
   }
 
   .app-main {
@@ -2187,45 +2205,53 @@ p.row + p,
   }
 }
 
-/* iOS 触控设备（含主屏幕 PWA）统一收紧底部 */
+/* iOS 触控：浏览器内收紧；PWA 以 standalone 规则为准 */
 @supports (-webkit-touch-callout: none) {
   @media (max-width: 768px) {
     :root {
-      --tab-row-h: 1.75rem;
-      --tab-icon-size: 1.2rem;
-      --safe-bottom-chrome: max(0.32rem, calc(env(safe-area-inset-bottom, 0px) * 0.38));
-      --chrome-bottom-h: calc(var(--footer-h) + var(--tab-row-h) + var(--safe-bottom-chrome));
+      --tab-row-h: 1.62rem;
+      --tab-icon-size: 1.12rem;
+      --safe-bottom-chrome: env(safe-area-inset-bottom, 0px);
+      --chrome-bottom-h: calc(
+        var(--footer-h) + var(--tab-row-h) + var(--safe-bottom-chrome)
+      );
     }
 
     .tab-bar {
-      padding-top: 0.22rem;
-      padding-bottom: 0.04rem;
+      padding-top: 0.14rem;
+      padding-bottom: var(--safe-bottom-chrome);
     }
 
     .tab-bar button {
-      padding: 0.02rem 0.08rem 0.15rem;
+      padding: 0 0.06rem 0.08rem;
     }
 
     .app-bottom-chrome {
-      padding-bottom: var(--safe-bottom-chrome);
+      padding-bottom: 0;
     }
   }
+}
 
-  @media (display-mode: standalone) {
-    :root {
-      --footer-h: 0;
-      --tab-row-h: 1.72rem;
-      --tab-icon-size: 1.22rem;
-      --safe-bottom-chrome: 0.35rem;
-      --chrome-bottom-h: calc(var(--tab-row-h) + var(--safe-bottom-chrome));
-    }
+/* iOS Safari：输入框字号 <16px 会聚焦时放大整页，覆盖组件内更小字号 */
+@supports (-webkit-touch-callout: none) {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
 
-    .app-footer {
-      display: none;
-    }
-
-    .app-main {
-      padding-bottom: var(--chrome-bottom-h);
-    }
+  input,
+  select,
+  textarea,
+  .chip-col .chip-name,
+  .chip-col .chip-select,
+  .player-form-col .player-form-name-input,
+  .player-form-col .player-form-level-select,
+  .player-form-col .player-form-gender-select,
+  .player-bulk-count-input,
+  .tournament-description-input,
+  .score-form-compact .score-big,
+  .score-form-compact .score-small,
+  .score-inputs input {
+    font-size: max(16px, 1em);
   }
 }

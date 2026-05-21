@@ -71,6 +71,12 @@ export interface Strings {
   singlesTitle: string;
   doubles: string;
   doublesTitle: string;
+  doublesPairing: string;
+  doublesPairingTitle: string;
+  doublesPairingFixed: string;
+  doublesPairingFixedTitle: string;
+  doublesPairingRotating: string;
+  doublesPairingRotatingTitle: string;
   teamGroupTitle: string;
   teamGroup: string;
   teamGroupHint: string;
@@ -271,6 +277,7 @@ export interface Strings {
   podiumHintKnockoutShort: string;
   errMinPlayers: string;
   errDoublesEven: string;
+  errDoublesPartnerMin: string;
   errMinTeams: string;
   errTeamCoverage: string;
   errMinGroups: string;

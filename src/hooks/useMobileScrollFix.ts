@@ -25,7 +25,7 @@ export function useMobileScrollFix() {
       ) {
         resetHorizontal();
         requestAnimationFrame(() => {
-          el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          el.scrollIntoView({ block: 'nearest', behavior: 'auto' });
         });
       }
     };

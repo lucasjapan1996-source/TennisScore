@@ -3,6 +3,7 @@ import { CollapsiblePanel } from './CollapsiblePanel';
 import type {
   BestOf,
   BestOfMode,
+  DoublesPairing,
   GroupAssignment,
   Match,
   MatchMode,
@@ -27,6 +28,7 @@ import { useStrings } from '../hooks/useStrings';
 
 interface ScheduleOverviewProps {
   mode: MatchMode;
+  doublesPairing: DoublesPairing;
   scheduleFormat: ScheduleFormat;
   category: TournamentCategory;
   bestOfMode: BestOfMode;
@@ -74,6 +76,7 @@ function sectionTitle(key: string): string {
 
 export function ScheduleOverview({
   mode,
+  doublesPairing,
   scheduleFormat,
   category,
   bestOfMode,
@@ -89,6 +92,7 @@ export function ScheduleOverview({
   const resolveCtx: ResolveSidesTournament = {
     matches,
     mode,
+    doublesPairing,
     players,
     teams,
     groups,
@@ -140,7 +144,7 @@ export function ScheduleOverview({
       title={S.fullSchedule}
       titleTitle={S.fullScheduleTitle}
       className="schedule-panel"
-      defaultOpen={false}
+      defaultOpen
     >
       <p className="stats-bar">
         <span className="stat-pill">

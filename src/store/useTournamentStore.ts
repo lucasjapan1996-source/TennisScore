@@ -20,9 +20,11 @@ import {
   DEFAULT_BEST_OF_MODE,
   DEFAULT_CUSTOM_BEST_OF_DEFAULT,
   DEFAULT_CUSTOM_BEST_OF_FINAL,
+  DEFAULT_DOUBLES_PAIRING,
   DEFAULT_GROUP_COUNT,
   DEFAULT_SCHEDULE_SEED_MODE,
   DEFAULT_TOURNAMENT_CATEGORY,
+  type DoublesPairing,
 } from '../types';
 import { normalizeBestOf, resolveMatchBestOf } from '../utils/bestOf';
 import { normalizePlayers } from '../utils/player';
@@ -42,7 +44,9 @@ import {
 import { applySetsToMatchScores, isValidMatchScore } from '../utils/score';
 import { normalizeSetScores } from '../utils/sets';
 import {
+  applyTeamPairChange,
   autoPairPlayers,
+  buildDoublesTeamsFromPlayers,
   buildGroupStageSchedule,
   buildKnockoutOnlySchedule,
   buildRoundRobinSchedule,
@@ -57,6 +61,10 @@ export { MAX_BULK_PLAYER_COUNT };
 
 function uid(): string {
   return crypto.randomUUID();
+}
+
+function shouldMaintainFixedTeams(t: Pick<Tournament, 'mode' | 'doublesPairing'>): boolean {
+  return t.mode === 'doubles' && t.doublesPairing === 'fixed';
 }
 
 function compactLabelForTournament(t: Tournament) {
@@ -74,6 +82,7 @@ function emptyTournament(): Tournament {
     description: '',
     category: DEFAULT_TOURNAMENT_CATEGORY,
     mode: 'singles',
+    doublesPairing: DEFAULT_DOUBLES_PAIRING,
     scheduleFormat: 'round_robin',
     scheduleSeedMode: DEFAULT_SCHEDULE_SEED_MODE,
     bestOfMode: DEFAULT_BEST_OF_MODE,
@@ -97,6 +106,7 @@ interface TournamentState {
   setTournamentDescription: (description: string) => void;
   setTournamentCategory: (category: TournamentCategory) => void;
   setMode: (mode: MatchMode) => void;
+  setDoublesPairing: (pairing: DoublesPairing) => void;
   setScheduleFormat: (format: ScheduleFormat) => void;
   setScheduleSeedMode: (mode: ScheduleSeedMode) => void;
   setBestOfMode: (mode: BestOfMode) => void;
@@ -117,7 +127,6 @@ interface TournamentState {
     id: string,
     patch: Partial<Pick<Player, 'name' | 'gender' | 'level'>>,
   ) => void;
-  autoPairTeams: () => void;
   setTeamPair: (teamIndex: number, playerAId: string, playerBId: string) => void;
   generateSchedule: () => string | null;
   updateMatchScore: (
@@ -171,6 +180,26 @@ export const useTournamentStore = create<TournamentState>()(
             tournament: {
               ...s.tournament,
               mode,
+              doublesPairing:
+                mode === 'doubles' ? s.tournament.doublesPairing : DEFAULT_DOUBLES_PAIRING,
+              teams,
+              matches: [],
+              groups: [],
+            },
+          };
+        }),
+
+      setDoublesPairing: (doublesPairing) =>
+        set((s) => {
+          const { players } = s.tournament;
+          const teams =
+            doublesPairing === 'fixed' && players.length >= 2
+              ? autoPairPlayers(players)
+              : [];
+          return {
+            tournament: {
+              ...s.tournament,
+              doublesPairing,
               teams,
               matches: [],
               groups: [],
@@ -266,10 +295,9 @@ export const useTournamentStore = create<TournamentState>()(
             ...s.tournament.players,
             { id: uid(), name: trimmed, gender: effectiveGender, level },
           ];
-          const teams =
-            s.tournament.mode === 'doubles'
-              ? autoPairPlayers(players)
-              : s.tournament.teams;
+          const teams = shouldMaintainFixedTeams(s.tournament)
+            ? autoPairPlayers(players)
+            : s.tournament.teams;
           return {
             tournament: {
               ...s.tournament,
@@ -294,10 +322,9 @@ export const useTournamentStore = create<TournamentState>()(
             level,
             uid,
           );
-          const teams =
-            s.tournament.mode === 'doubles'
-              ? autoPairPlayers(players)
-              : s.tournament.teams;
+          const teams = shouldMaintainFixedTeams(s.tournament)
+            ? autoPairPlayers(players)
+            : s.tournament.teams;
           return {
             tournament: {
               ...s.tournament,
@@ -315,10 +342,9 @@ export const useTournamentStore = create<TournamentState>()(
         const idSet = new Set(ids);
         set((s) => {
           const players = s.tournament.players.filter((p) => !idSet.has(p.id));
-          const teams =
-            s.tournament.mode === 'doubles'
-              ? autoPairPlayers(players)
-              : [];
+          const teams = shouldMaintainFixedTeams(s.tournament)
+            ? autoPairPlayers(players)
+            : [];
           const matches = s.tournament.matches.filter(
             (m) =>
               !m.sideAIds.some((pid) => idSet.has(pid)) &&
@@ -344,10 +370,9 @@ export const useTournamentStore = create<TournamentState>()(
       removePlayer: (id) =>
         set((s) => {
           const players = s.tournament.players.filter((p) => p.id !== id);
-          const teams =
-            s.tournament.mode === 'doubles'
-              ? autoPairPlayers(players)
-              : [];
+          const teams = shouldMaintainFixedTeams(s.tournament)
+            ? autoPairPlayers(players)
+            : [];
           const matches = s.tournament.matches.filter(
             (m) =>
               !m.sideAIds.includes(id) && !m.sideBIds.includes(id),
@@ -367,26 +392,25 @@ export const useTournamentStore = create<TournamentState>()(
           },
         })),
 
-      autoPairTeams: () =>
-        set((s) => ({
-          tournament: {
-            ...s.tournament,
-            teams: autoPairPlayers(s.tournament.players),
-            matches: [],
-            groups: [],
-          },
-        })),
-
       setTeamPair: (teamIndex, playerAId, playerBId) =>
         set((s) => {
-          const teams = [...s.tournament.teams];
+          const { players, teams } = s.tournament;
           if (teamIndex < 0 || teamIndex >= teams.length) return s;
-          teams[teamIndex] = {
-            ...teams[teamIndex],
-            playerIds: [playerAId, playerBId],
-          };
+          const playerOrder = players.map((p) => p.id);
+          const nextTeams = applyTeamPairChange(
+            teams,
+            teamIndex,
+            playerAId,
+            playerBId,
+            playerOrder,
+          );
           return {
-            tournament: { ...s.tournament, teams, matches: [], groups: [] },
+            tournament: {
+              ...s.tournament,
+              teams: nextTeams,
+              matches: [],
+              groups: [],
+            },
           };
         }),
 
@@ -398,15 +422,21 @@ export const useTournamentStore = create<TournamentState>()(
           tournament.teams,
           tournament.scheduleFormat,
           tournament.groupCount,
+          tournament.doublesPairing,
         );
         if (err) return err;
 
         const seedMode = tournament.scheduleSeedMode;
+        const scheduleTeams =
+          tournament.mode === 'doubles' &&
+          tournament.doublesPairing === 'rotating'
+            ? buildDoublesTeamsFromPlayers(tournament.players, seedMode)
+            : tournament.teams;
         const result =
           tournament.scheduleFormat === 'group_stage'
             ? buildGroupStageSchedule(
                 tournament.players,
-                tournament.teams,
+                scheduleTeams,
                 tournament.mode,
                 tournament.groupCount,
                 seedMode,
@@ -414,15 +444,16 @@ export const useTournamentStore = create<TournamentState>()(
             : tournament.scheduleFormat === 'knockout'
               ? buildKnockoutOnlySchedule(
                   tournament.players,
-                  tournament.teams,
+                  scheduleTeams,
                   tournament.mode,
                   seedMode,
                 )
               : buildRoundRobinSchedule(
                   tournament.players,
-                  tournament.teams,
+                  scheduleTeams,
                   tournament.mode,
                   seedMode,
+                  tournament.doublesPairing,
                 );
 
         set((s) => ({
@@ -430,6 +461,11 @@ export const useTournamentStore = create<TournamentState>()(
             ...s.tournament,
             matches: result.matches,
             groups: result.groups,
+            teams:
+              tournament.mode === 'doubles' &&
+              tournament.doublesPairing === 'rotating'
+                ? scheduleTeams
+                : s.tournament.teams,
           },
         }));
         return null;
@@ -628,6 +664,10 @@ export const useTournamentStore = create<TournamentState>()(
                 : (raw as Tournament).category === 'mixed'
                   ? 'mixed'
                   : DEFAULT_TOURNAMENT_CATEGORY,
+            doublesPairing:
+              (raw as Tournament).doublesPairing === 'rotating'
+                ? 'rotating'
+                : DEFAULT_DOUBLES_PAIRING,
             players: normalizePlayersForCategory(
               normalizePlayers(raw.players ?? []),
               (raw as Tournament).category === 'women'

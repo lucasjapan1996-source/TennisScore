@@ -48,6 +48,7 @@ export function SetupPanel() {
   const {
     tournament,
     setMode,
+    setDoublesPairing,
     setScheduleFormat,
     setScheduleSeedMode,
     setBestOfMode,
@@ -55,7 +56,6 @@ export function SetupPanel() {
     setCustomBestOfDefault,
     setCustomBestOfFinal,
     setGroupCount,
-    autoPairTeams,
     setTeamPair,
     generateSchedule,
     setActiveTab,
@@ -67,16 +67,34 @@ export function SetupPanel() {
     setError(err);
   };
 
+  const isDoubles = tournament.mode === 'doubles';
+  const isDoublesFixed = isDoubles && tournament.doublesPairing === 'fixed';
+  const isDoublesRotating = isDoubles && tournament.doublesPairing === 'rotating';
+
   const entityCount =
     tournament.mode === 'singles'
       ? tournament.players.length
-      : tournament.teams.length;
+      : isDoublesRotating
+        ? Math.max(0, Math.floor(tournament.players.length / 2))
+        : tournament.teams.length;
 
   const matchCount = estimateMatchCount(
     entityCount,
     tournament.scheduleFormat,
     tournament.groupCount,
+    {
+      mode: tournament.mode,
+      playerCount: tournament.players.length,
+      doublesPairing: tournament.doublesPairing,
+    },
   );
+
+  const canGenerate =
+    tournament.mode === 'singles'
+      ? tournament.players.length >= 2
+      : isDoublesRotating
+        ? tournament.players.length >= 4
+        : entityCount >= 2;
 
   const isRoundRobin = tournament.scheduleFormat === 'round_robin';
   const hasFinal = tournamentHasFinal(tournament.scheduleFormat);
@@ -121,6 +139,31 @@ export function SetupPanel() {
             {S.doubles}
           </button>
         </section>
+        {isDoubles && (
+          <>
+            <h2 className="panel-subtitle" title={S.doublesPairingTitle}>
+              {S.doublesPairing}
+            </h2>
+            <section className="mode-toggle mode-toggle-2">
+              <button
+                type="button"
+                className={isDoublesFixed ? 'active' : ''}
+                onClick={() => setDoublesPairing('fixed')}
+                title={S.doublesPairingFixedTitle}
+              >
+                {S.doublesPairingFixed}
+              </button>
+              <button
+                type="button"
+                className={isDoublesRotating ? 'active' : ''}
+                onClick={() => setDoublesPairing('rotating')}
+                title={S.doublesPairingRotatingTitle}
+              >
+                {S.doublesPairingRotating}
+              </button>
+            </section>
+          </>
+        )}
       </CollapsiblePanel>
 
       <CollapsiblePanel
@@ -252,7 +295,7 @@ export function SetupPanel() {
         )}
       </CollapsiblePanel>
 
-      {tournament.mode === 'doubles' && tournament.players.length >= 2 && (
+      {isDoublesFixed && tournament.players.length >= 2 && (
         <CollapsiblePanel title={S.teamGroup} titleTitle={S.teamGroupTitle} compact>
           {tournament.teams.map((team, idx) => (
             <article key={team.id} className="team-card">
@@ -288,16 +331,6 @@ export function SetupPanel() {
               </p>
             </article>
           ))}
-          <p className="btn-row">
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={autoPairTeams}
-              title={S.autoPairTitle}
-            >
-              {S.autoPair}
-            </button>
-          </p>
         </CollapsiblePanel>
       )}
 
@@ -346,7 +379,7 @@ export function SetupPanel() {
           <span className="stat-pill">
             {S.statPlayers} <strong>{tournament.players.length}</strong>
           </span>
-          {tournament.mode === 'doubles' && (
+          {isDoublesFixed && (
             <span className="stat-pill">
               {S.statTeams} <strong>{tournament.teams.length}</strong>
             </span>
@@ -395,8 +428,8 @@ export function SetupPanel() {
             type="button"
             className="btn-primary"
             onClick={handleGenerate}
-            disabled={entityCount < 2}
-            title={entityCount < 2 ? S.generateDisabledTitle : S.generateTitle}
+            disabled={!canGenerate}
+            title={!canGenerate ? S.generateDisabledTitle : S.generateTitle}
           >
             {S.generate}
           </button>
@@ -416,6 +449,7 @@ export function SetupPanel() {
       {tournament.matches.length > 0 && (
         <ScheduleOverview
           mode={tournament.mode}
+          doublesPairing={tournament.doublesPairing}
           scheduleFormat={tournament.scheduleFormat}
           category={tournament.category}
           bestOfMode={tournament.bestOfMode}

@@ -7,7 +7,8 @@ import type {
   StandingRow,
   Team,
 } from '../types';
-import type { BestOfTournamentFields, StandingTournamentFields } from './bestOf';
+import type { BestOf } from '../types';
+import type { StandingTournamentFields } from './bestOf';
 import { resolveMatchBestOf } from './bestOf';
 import {
   getMatchWinnerSide,
@@ -55,15 +56,24 @@ function entityKey(ids: string[]): string {
   return [...ids].sort().join(',');
 }
 
+function isDoublesPartnerRoundRobin(t: StandingTournamentFields): boolean {
+  return (
+    t.mode === 'doubles' &&
+    t.scheduleFormat === 'round_robin' &&
+    t.doublesPairing === 'rotating'
+  );
+}
+
 function buildEntities(
   mode: MatchMode,
   players: Player[],
   teams: Team[],
   showGender: boolean,
+  tournament: StandingTournamentFields,
 ): Map<string, EntityStats> {
   const map = new Map<string, EntityStats>();
 
-  if (mode === 'singles') {
+  if (mode === 'singles' || isDoublesPartnerRoundRobin(tournament)) {
     for (const p of players) {
       map.set(p.id, {
         id: p.id,
@@ -146,12 +156,63 @@ export function computeGroupStandings(
   return computeStandings(mode, players, subsetTeams, groupMatches, tournament);
 }
 
+function applyPlayerDoublesMatchToStats(
+  stats: Map<string, EntityStats>,
+  m: Match,
+  bestOf: BestOf,
+): void {
+  const bumpSide = (
+    ids: string[],
+    won: boolean,
+    scoreFor: number,
+    scoreAgainst: number,
+  ) => {
+    for (const id of ids) {
+      const row = stats.get(id);
+      if (!row) continue;
+      row.played++;
+      if (won) row.wins++;
+      else row.losses++;
+      row.gamesFor += scoreFor;
+      row.gamesAgainst += scoreAgainst;
+    }
+  };
+
+  if (isRetired(m) && !matchHasRecordedScore(m, bestOf)) {
+    const winner = getMatchWinnerSide(m, bestOf);
+    if (!winner) return;
+    if (winner === 'A') {
+      bumpSide(m.sideAIds, true, 0, 0);
+      bumpSide(m.sideBIds, false, 0, 0);
+    } else {
+      bumpSide(m.sideBIds, true, 0, 0);
+      bumpSide(m.sideAIds, false, 0, 0);
+    }
+    return;
+  }
+
+  if (m.scoreA === null || m.scoreB === null) return;
+
+  if (m.scoreA > m.scoreB) {
+    bumpSide(m.sideAIds, true, m.scoreA, m.scoreB);
+    bumpSide(m.sideBIds, false, m.scoreB, m.scoreA);
+  } else if (m.scoreB > m.scoreA) {
+    bumpSide(m.sideBIds, true, m.scoreB, m.scoreA);
+    bumpSide(m.sideAIds, false, m.scoreA, m.scoreB);
+  }
+}
+
 function applyMatchToStats(
   stats: Map<string, EntityStats>,
   m: Match,
-  tournament: BestOfTournamentFields,
+  tournament: StandingTournamentFields,
 ): void {
   const bestOf = resolveMatchBestOf(m, tournament);
+
+  if (isDoublesPartnerRoundRobin(tournament)) {
+    applyPlayerDoublesMatchToStats(stats, m, bestOf);
+    return;
+  }
 
   if (isRetired(m) && !matchHasRecordedScore(m, bestOf)) {
     const winner = getMatchWinnerSide(m, bestOf);
@@ -272,7 +333,7 @@ export function computeGroupAndKnockoutStandings(
     (m) => (m.phase === 'group' || m.phase === 'knockout') && isStandingMatch(m),
   );
   const showGender = showPlayerGender(tournament.category);
-  const stats = buildEntities(mode, players, teams, showGender);
+  const stats = buildEntities(mode, players, teams, showGender, tournament);
   for (const m of relevant) {
     applyMatchToStats(stats, m, tournament);
   }
@@ -290,7 +351,7 @@ export function computeStandings(
     (m) => m.phase !== 'knockout' && isStandingMatch(m),
   );
   const showGender = showPlayerGender(tournament.category);
-  const stats = buildEntities(mode, players, teams, showGender);
+  const stats = buildEntities(mode, players, teams, showGender, tournament);
 
   for (const m of relevant) {
     applyMatchToStats(stats, m, tournament);

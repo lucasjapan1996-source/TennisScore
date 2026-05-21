@@ -14,7 +14,7 @@ export type BestOfTournamentFields = Pick<
 >;
 
 export type StandingTournamentFields = BestOfTournamentFields &
-  Pick<Tournament, 'category'>;
+  Pick<Tournament, 'category' | 'mode' | 'scheduleFormat' | 'doublesPairing'>;
 
 /** 按赛事配置解析单场对阵的 bo 赛制 */
 export function resolveMatchBestOf(

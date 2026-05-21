@@ -89,6 +89,7 @@ export type KnockoutResolveTournament = Pick<
   Tournament,
   | 'matches'
   | 'mode'
+  | 'doublesPairing'
   | 'players'
   | 'teams'
   | 'groups'

@@ -43,6 +43,7 @@ function baseTournament(overrides: Partial<Tournament> = {}): Tournament {
     description: '',
     category: 'men',
     mode: 'singles',
+    doublesPairing: 'fixed',
     scheduleFormat: 'round_robin',
     scheduleSeedMode: 'sequential',
     bestOfMode: 'uniform',
@@ -152,17 +153,55 @@ describe('schedule formats (simulated)', () => {
     );
   });
 
-  it('doubles requires even players and full team coverage', () => {
+  it('doubles fixed teams: 4 players → 1 team match', () => {
     const players = mockPlayers(3);
     const teams = autoPairPlayers(players);
-    expect(validateBeforeSchedule('doubles', players, teams, 'round_robin', 2)).not.toBeNull();
+    expect(
+      validateBeforeSchedule('doubles', players, teams, 'round_robin', 2, 'fixed'),
+    ).not.toBeNull();
 
     const p4 = mockPlayers(4);
     const t4 = autoPairPlayers(p4);
-    expect(validateBeforeSchedule('doubles', p4, t4, 'round_robin', 2)).toBeNull();
-    const { matches } = buildRoundRobinSchedule(p4, t4, 'doubles', 'sequential');
+    expect(
+      validateBeforeSchedule('doubles', p4, t4, 'round_robin', 2, 'fixed'),
+    ).toBeNull();
+    const { matches } = buildRoundRobinSchedule(
+      p4,
+      t4,
+      'doubles',
+      'sequential',
+      'fixed',
+    );
     expect(matches.length).toBe(1);
-    expect(estimateMatchCount(2, 'round_robin', 2)).toBe(1);
+    expect(
+      estimateMatchCount(2, 'round_robin', 2, {
+        mode: 'doubles',
+        playerCount: 4,
+        doublesPairing: 'fixed',
+      }),
+    ).toBe(1);
+  });
+
+  it('doubles rotating partners: 4 players → 3 matches', () => {
+    const p4 = mockPlayers(4);
+    expect(
+      validateBeforeSchedule('doubles', p4, [], 'round_robin', 2, 'rotating'),
+    ).toBeNull();
+    const { matches } = buildRoundRobinSchedule(
+      p4,
+      [],
+      'doubles',
+      'sequential',
+      'rotating',
+    );
+    expect(matches.length).toBe(3);
+    expect(
+      estimateMatchCount(2, 'round_robin', 2, {
+        mode: 'doubles',
+        playerCount: 4,
+        doublesPairing: 'rotating',
+      }),
+    ).toBe(3);
   });
 });
 
