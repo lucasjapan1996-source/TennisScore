@@ -6,10 +6,14 @@ import type {
   MatchMode,
   Player,
   Team,
+  ScheduleSeedMode,
   Tournament,
 } from '../types';
-import { S } from '../strings';
+import { orderEntities } from './schedule';
+import { getActiveStrings } from '../i18n';
 import { computeGroupStandings } from './ranking';
+import { getMatchWinnerSide, winnerIdsForSide } from './matchOutcome';
+import { resolveMatchBestOf } from './bestOf';
 import { isMatchPlayed } from './score';
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -26,63 +30,79 @@ function entityKey(ids: string[]): string {
 
 export function slotLabel(slot: KnockoutSlot): string {
   if (slot.kind === 'group_rank') {
-    return S.knockoutSlotGroupRank(slot.group, slot.rank);
+    return getActiveStrings().knockoutSlotGroupRank(slot.group, slot.rank);
   }
-  return slot.kind === 'winner' ? S.knockoutSlotWinner : S.knockoutSlotLoser;
+  return slot.kind === 'winner' ? getActiveStrings().knockoutSlotWinner : getActiveStrings().knockoutSlotLoser;
 }
 
 export function knockoutStageLabel(stage: KnockoutStage): string {
   switch (stage) {
     case 'cross':
-      return S.knockoutCross;
+      return getActiveStrings().knockoutCross;
     case 'quarter':
-      return S.knockoutQuarter;
+      return getActiveStrings().knockoutQuarter;
     case 'semi':
-      return S.knockoutSemi;
+      return getActiveStrings().knockoutSemi;
     case 'third':
-      return S.knockoutThirdLegacy;
+      return getActiveStrings().knockoutThirdLegacy;
     case 'final':
-      return S.knockoutFinal;
+      return getActiveStrings().knockoutFinal;
     case 'bye':
-      return S.knockoutBye;
+      return getActiveStrings().knockoutBye;
     default:
-      return S.knockoutStage;
+      return getActiveStrings().knockoutStage;
   }
 }
 
 export function knockoutMatchLabel(m: Match): string {
-  if (m.isBye) return S.knockoutBye;
+  if (m.isBye) return getActiveStrings().knockoutBye;
   const tier = m.knockoutRank ?? 1;
   if (m.knockoutStage === 'cross') {
-    return S.knockoutCrossRank(tier);
+    return getActiveStrings().knockoutCrossRank(tier);
   }
-  const stage = m.knockoutStage ? knockoutStageLabel(m.knockoutStage) : S.knockoutStage;
-  return S.knockoutRankMatch(tier, stage);
+  const stage = m.knockoutStage ? knockoutStageLabel(m.knockoutStage) : getActiveStrings().knockoutStage;
+  return getActiveStrings().knockoutRankMatch(tier, stage);
 }
 
-function getMatchWinnerIds(m: Match): string[] | null {
+function getMatchWinnerIds(m: Match, tournament: KnockoutResolveTournament): string[] | null {
   if (m.isBye) {
     if (m.sideAIds.length > 0) return m.sideAIds;
     if (m.sideBIds.length > 0) return m.sideBIds;
     return null;
   }
-  if (!isMatchPlayed(m) || m.scoreA === null || m.scoreB === null) return null;
-  if (m.scoreA > m.scoreB) return m.sideAIds;
-  if (m.scoreB > m.scoreA) return m.sideBIds;
-  return null;
+  const bestOf = resolveMatchBestOf(m, tournament);
+  const side = getMatchWinnerSide(m, bestOf);
+  if (!side) return null;
+  return winnerIdsForSide(m, side);
 }
 
-function getMatchLoserIds(m: Match): string[] | null {
+function getMatchLoserIds(m: Match, tournament: KnockoutResolveTournament): string[] | null {
   if (m.isBye) return null;
-  if (!isMatchPlayed(m) || m.scoreA === null || m.scoreB === null) return null;
-  if (m.scoreA > m.scoreB) return m.sideBIds;
-  if (m.scoreB > m.scoreA) return m.sideAIds;
-  return null;
+  const bestOf = resolveMatchBestOf(m, tournament);
+  const winner = getMatchWinnerSide(m, bestOf);
+  if (!winner) return null;
+  const loser = winner === 'A' ? 'B' : 'A';
+  return winnerIdsForSide(m, loser);
 }
+
+export type KnockoutResolveTournament = Pick<
+  Tournament,
+  | 'matches'
+  | 'mode'
+  | 'players'
+  | 'teams'
+  | 'groups'
+  | 'category'
+  | 'scheduleFormat'
+  | 'bestOfMode'
+  | 'bestOf'
+  | 'customBestOfDefault'
+  | 'customBestOfFinal'
+>;
 
 function resolveByeWinnerIds(
   m: Match,
-  tournament: Pick<Tournament, 'matches' | 'mode' | 'players' | 'teams' | 'groups'>,
+  tournament: KnockoutResolveTournament,
 ): string[] | null {
   if (!m.isBye) return null;
   if (m.sideAIds.length > 0) return m.sideAIds;
@@ -94,7 +114,7 @@ function resolveByeWinnerIds(
 
 function resolveSlot(
   slot: KnockoutSlot,
-  tournament: Pick<Tournament, 'matches' | 'mode' | 'players' | 'teams' | 'groups'>,
+  tournament: KnockoutResolveTournament,
 ): string[] | null {
   if (slot.kind === 'group_rank') {
     const standings = computeGroupStandings(
@@ -104,6 +124,7 @@ function resolveSlot(
       tournament.teams,
       tournament.groups,
       tournament.matches,
+      tournament,
     );
     const row = standings.find((r) => r.rank === slot.rank);
     if (!row) return null;
@@ -120,8 +141,8 @@ function resolveSlot(
     return resolveByeWinnerIds(ref, tournament);
   }
   return slot.kind === 'winner'
-    ? getMatchWinnerIds(ref)
-    : getMatchLoserIds(ref);
+    ? getMatchWinnerIds(ref, tournament)
+    : getMatchLoserIds(ref, tournament);
 }
 
 export function isGroupStageCompleteForKnockout(
@@ -135,7 +156,7 @@ export function isGroupStageCompleteForKnockout(
 function resolveKnockoutSideIds(
   m: Match,
   side: 'A' | 'B',
-  tournament: Pick<Tournament, 'matches' | 'mode' | 'players' | 'teams' | 'groups'>,
+  tournament: KnockoutResolveTournament,
 ): string[] | null {
   const ids = side === 'A' ? m.sideAIds : m.sideBIds;
   const slot = side === 'A' ? m.slotA : m.slotB;
@@ -146,10 +167,7 @@ function resolveKnockoutSideIds(
 
 export function isKnockoutMatchReady(
   m: Match,
-  tournament: Pick<
-    Tournament,
-    'matches' | 'mode' | 'players' | 'teams' | 'groups' | 'scheduleFormat'
-  >,
+  tournament: ResolveSidesTournament,
 ): boolean {
   if (m.phase !== 'knockout') return true;
   if (m.isBye) return true;
@@ -169,12 +187,12 @@ export interface ResolvedMatchSides {
   waitingReason: string | null;
 }
 
+export type ResolveSidesTournament = KnockoutResolveTournament &
+  Pick<Tournament, 'scheduleFormat'>;
+
 export function resolveMatchSides(
   m: Match,
-  tournament: Pick<
-    Tournament,
-    'matches' | 'mode' | 'players' | 'teams' | 'groups' | 'scheduleFormat'
-  >,
+  tournament: ResolveSidesTournament,
   formatLabel: (ids: string[], players: Player[]) => string,
 ): ResolvedMatchSides {
   if (m.phase === 'group') {
@@ -202,7 +220,7 @@ export function resolveMatchSides(
       sideAIds: winnerIds ?? [],
       sideBIds: [],
       labelA: winnerLabel,
-      labelB: S.knockoutByeShort,
+      labelB: getActiveStrings().knockoutByeShort,
       ready: true,
       waitingReason: null,
     };
@@ -215,7 +233,7 @@ export function resolveMatchSides(
       labelA: m.slotA ? slotLabel(m.slotA) : '?',
       labelB: m.slotB ? slotLabel(m.slotB) : '?',
       ready: false,
-      waitingReason: S.knockoutWaitGroup,
+      waitingReason: getActiveStrings().knockoutWaitGroup,
     };
   }
 
@@ -239,7 +257,7 @@ export function resolveMatchSides(
       labelA,
       labelB,
       ready: false,
-      waitingReason: S.knockoutWaitPrior,
+      waitingReason: getActiveStrings().knockoutWaitPrior,
     };
   }
 
@@ -284,10 +302,13 @@ type BracketEntrant =
   | { kind: 'winner'; matchId: string }
   | { kind: 'loser'; matchId: string };
 
-function padWithRandomByes<T>(entries: T[]): (T | null)[] {
+function padWithByes<T>(entries: T[], seedMode: ScheduleSeedMode): (T | null)[] {
   const size = nextPowerOfTwo(Math.max(2, entries.length));
   const slots: (T | null)[] = Array(size).fill(null);
-  const positions = shuffle([...Array(size).keys()]);
+  const positions =
+    seedMode === 'random'
+      ? shuffle([...Array(size).keys()])
+      : [...Array(size).keys()];
   entries.forEach((entry, i) => {
     slots[positions[i]] = entry;
   });
@@ -326,6 +347,8 @@ function createKnockoutAdd(matches: Match[], startOrder: number) {
       scoreB: isBye ? 0 : null,
       tiebreakA: 0,
       tiebreakB: 0,
+      sets: [],
+      retiredSide: null,
       playedAt: isBye ? new Date().toISOString() : null,
       isBye,
     };
@@ -382,6 +405,7 @@ function buildEliminationBracket(
   >,
   rankTier: number,
   add: ReturnType<typeof createKnockoutAdd>,
+  seedMode: ScheduleSeedMode,
 ): void {
   if (entrants.length === 2) {
     const stage = entrants[0].kind === 'slot' ? 'cross' : 'final';
@@ -389,7 +413,7 @@ function buildEliminationBracket(
     return;
   }
 
-  let current: (BracketEntrant | null)[] = padWithRandomByes(entrants);
+  let current: (BracketEntrant | null)[] = padWithByes(entrants, seedMode);
 
   while (current.length > 1) {
     if (current.length === 2) {
@@ -435,21 +459,22 @@ export function buildPureKnockoutSchedule(
   players: Player[],
   teams: Team[],
   mode: MatchMode,
+  seedMode: ScheduleSeedMode = 'random',
 ): { matches: Match[]; nextOrder: number } {
   const entrants =
     mode === 'singles'
-      ? shuffle(players).map((p) => ({
+      ? orderEntities(players, seedMode).map((p) => ({
           kind: 'sides' as const,
           sideIds: [p.id],
         }))
-      : shuffle(teams).map((t) => ({
+      : orderEntities(teams, seedMode).map((t) => ({
           kind: 'sides' as const,
           sideIds: [...t.playerIds],
         }));
 
   const matches: Match[] = [];
   const add = createKnockoutAdd(matches, 1);
-  buildEliminationBracket(entrants, 1, add);
+  buildEliminationBracket(entrants, 1, add, seedMode);
   return { matches, nextOrder: matches.length + 1 };
 }
 
@@ -462,35 +487,35 @@ function buildKnockoutForRank(
   rank: number,
   groups: GroupAssignment[],
   add: ReturnType<typeof createKnockoutAdd>,
+  seedMode: ScheduleSeedMode,
 ): void {
   const sorted = [...groups].sort((a, b) => a.id - b.id);
   const entrants = sorted.map((g) => ({
     kind: 'slot' as const,
     slot: { kind: 'group_rank' as const, group: g.id, rank },
   }));
-  buildEliminationBracket(entrants, rank, add);
+  buildEliminationBracket(entrants, rank, add, seedMode);
 }
 
 export function buildKnockoutMatches(
   groups: GroupAssignment[],
   startOrder: number,
+  seedMode: ScheduleSeedMode = 'random',
 ): { matches: Match[]; nextOrder: number } {
   const matches: Match[] = [];
   const add = createKnockoutAdd(matches, startOrder);
 
   const maxRank = maxKnockoutRank(groups);
   for (let r = 1; r <= maxRank; r++) {
-    buildKnockoutForRank(r, groups, add);
+    buildKnockoutForRank(r, groups, add, seedMode);
   }
 
   return { matches, nextOrder: startOrder + matches.length };
 }
 
 export function getTournamentChampion(
-  tournament: Pick<
-    Tournament,
-    'matches' | 'mode' | 'players' | 'teams' | 'groups' | 'scheduleFormat'
-  >,
+  tournament: ResolveSidesTournament &
+    Pick<Tournament, 'scheduleFormat'>,
   formatLabel: (ids: string[], players: Player[]) => string,
 ): string | null {
   if (
@@ -508,9 +533,11 @@ export function getTournamentChampion(
   if (!titleMatch || !isMatchPlayed(titleMatch)) return null;
   const resolved = resolveMatchSides(titleMatch, tournament, formatLabel);
   if (!resolved.ready) return null;
-  return titleMatch.scoreA !== null &&
-    titleMatch.scoreB !== null &&
-    titleMatch.scoreA > titleMatch.scoreB
-    ? resolved.labelA
-    : resolved.labelB;
+  const winnerSide = getMatchWinnerSide(
+    titleMatch,
+    resolveMatchBestOf(titleMatch, tournament),
+  );
+  if (winnerSide === 'A') return resolved.labelA;
+  if (winnerSide === 'B') return resolved.labelB;
+  return null;
 }

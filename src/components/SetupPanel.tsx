@@ -3,20 +3,64 @@ import { useTournamentStore } from '../store/useTournamentStore';
 import { estimateMatchCount } from '../utils/schedule';
 import { PlayerLabel } from './PlayerLabel';
 import { ScheduleOverview } from './ScheduleOverview';
-import { S } from '../strings';
+import { useStrings } from '../hooks/useStrings';
+import { tournamentHasFinal } from '../utils/bestOf';
+import type { BestOf } from '../types';
+import { showPlayerGender } from '../utils/tournamentCategory';
+import { CollapsiblePanel } from './CollapsiblePanel';
+
+const BEST_OF_OPTIONS: BestOf[] = [1, 3, 5];
+
+function BestOfButtons({
+  value,
+  onChange,
+  ariaLabel,
+}: {
+  value: BestOf;
+  onChange: (n: BestOf) => void;
+  ariaLabel: string;
+}) {
+  const S = useStrings();
+  return (
+    <section
+      className="mode-toggle mode-toggle-3 best-of-row"
+      role="group"
+      aria-label={ariaLabel}
+    >
+      {BEST_OF_OPTIONS.map((n) => (
+        <button
+          key={n}
+          type="button"
+          className={value === n ? 'active' : ''}
+          onClick={() => onChange(n)}
+          title={n === 1 ? S.bo1Title : n === 3 ? S.bo3Title : S.bo5Title}
+        >
+          {n === 1 ? S.bo1 : n === 3 ? S.bo3 : S.bo5}
+        </button>
+      ))}
+    </section>
+  );
+}
 
 export function SetupPanel() {
+  const S = useStrings();
   const [error, setError] = useState<string | null>(null);
   const {
     tournament,
     setMode,
     setScheduleFormat,
+    setScheduleSeedMode,
+    setBestOfMode,
+    setBestOf,
+    setCustomBestOfDefault,
+    setCustomBestOfFinal,
     setGroupCount,
     autoPairTeams,
     setTeamPair,
     generateSchedule,
     setActiveTab,
   } = useTournamentStore();
+  const genderVisible = showPlayerGender(tournament.category);
 
   const handleGenerate = () => {
     const err = generateSchedule();
@@ -34,6 +78,16 @@ export function SetupPanel() {
     tournament.groupCount,
   );
 
+  const isRoundRobin = tournament.scheduleFormat === 'round_robin';
+  const hasFinal = tournamentHasFinal(tournament.scheduleFormat);
+  const isCustomBo = !isRoundRobin && tournament.bestOfMode === 'custom';
+  const bestOfSummary = isCustomBo
+    ? S.bestOfCustomHintShort(
+        tournament.customBestOfDefault,
+        tournament.customBestOfFinal,
+      )
+    : S.bestOfHintShort(tournament.bestOf);
+
   const memberLabel = (id: string) => {
     if (tournament.mode === 'singles') {
       const p = tournament.players.find((x) => x.id === id);
@@ -48,9 +102,8 @@ export function SetupPanel() {
 
   return (
     <>
-      <section className="panel">
-        <h2 title={S.modeTitle}>{S.mode}</h2>
-        <section className="mode-toggle">
+      <CollapsiblePanel title={S.mode} titleTitle={S.modeTitle} compact>
+        <section className="mode-toggle mode-toggle-2">
           <button
             type="button"
             className={tournament.mode === 'singles' ? 'active' : ''}
@@ -68,10 +121,13 @@ export function SetupPanel() {
             {S.doubles}
           </button>
         </section>
-      </section>
+      </CollapsiblePanel>
 
-      <section className="panel">
-        <h2 title={S.scheduleFormatTitle}>{S.scheduleFormat}</h2>
+      <CollapsiblePanel
+        title={S.scheduleFormat}
+        titleTitle={S.scheduleFormatTitle}
+        compact
+      >
         <section className="mode-toggle mode-toggle-3">
           <button
             type="button"
@@ -98,19 +154,91 @@ export function SetupPanel() {
             {S.knockoutOnly}
           </button>
         </section>
-        <p className="hint" style={{ marginTop: '0.75rem' }}>
-          {tournament.scheduleFormat === 'round_robin'
-            ? S.roundRobinHint
-            : tournament.scheduleFormat === 'group_stage'
-              ? S.groupStageHint
-              : S.knockoutOnlyHint}
-        </p>
-        {tournament.scheduleFormat === 'group_stage' && (
-          <p className="hint">{S.knockoutBracketHint}</p>
+        {isRoundRobin ? (
+          <>
+            <h2 className="best-of-round-robin-title" title={S.bestOfTitle}>
+              {S.bestOf}
+            </h2>
+            <BestOfButtons
+              value={tournament.bestOf}
+              onChange={setBestOf}
+              ariaLabel={S.bestOf}
+            />
+          </>
+        ) : (
+          <>
+            <div className="panel-field-row">
+              <h2 className="panel-field-label" title={S.bestOfTitle}>
+                {S.bestOf}
+              </h2>
+              <div className="panel-field-control">
+                <section
+                  className="mode-toggle mode-toggle-2"
+                  role="group"
+                  aria-label={S.bestOf}
+                >
+                  <button
+                    type="button"
+                    className={!isCustomBo ? 'active' : ''}
+                    onClick={() => setBestOfMode('uniform')}
+                    title={S.bestOfModeUniformTitle}
+                  >
+                    {S.bestOfModeUniform}
+                  </button>
+                  <button
+                    type="button"
+                    className={isCustomBo ? 'active' : ''}
+                    onClick={() => setBestOfMode('custom')}
+                    title={S.bestOfModeCustomTitle}
+                  >
+                    {S.bestOfModeCustom}
+                  </button>
+                </section>
+              </div>
+            </div>
+            {!isCustomBo ? (
+              <BestOfButtons
+                value={tournament.bestOf}
+                onChange={setBestOf}
+                ariaLabel={S.bestOfModeUniform}
+              />
+            ) : (
+              <div className="best-of-custom">
+                <label className="best-of-custom-label">
+                  <span title={S.customBestOfDefaultTitle}>
+                    {S.customBestOfDefault}
+                  </span>
+                  <BestOfButtons
+                    value={tournament.customBestOfDefault}
+                    onChange={setCustomBestOfDefault}
+                    ariaLabel={S.customBestOfDefault}
+                  />
+                </label>
+                <label
+                  className={`best-of-custom-label${!hasFinal ? ' disabled' : ''}`}
+                >
+                  <span
+                    title={
+                      hasFinal
+                        ? S.customBestOfFinalTitle
+                        : S.customBestOfFinalDisabledHint
+                    }
+                  >
+                    {S.customBestOfFinal}
+                  </span>
+                  <BestOfButtons
+                    value={tournament.customBestOfFinal}
+                    onChange={setCustomBestOfFinal}
+                    ariaLabel={S.customBestOfFinal}
+                  />
+                </label>
+              </div>
+            )}
+          </>
         )}
 
         {tournament.scheduleFormat === 'group_stage' && (
-          <label className="field-label" style={{ marginTop: '0.75rem' }}>
+          <label className="field-label field-label-compact">
             <span title={S.groupCountTitle}>{S.groupCount}</span>
             <input
               type="number"
@@ -122,14 +250,10 @@ export function SetupPanel() {
             />
           </label>
         )}
-      </section>
+      </CollapsiblePanel>
 
       {tournament.mode === 'doubles' && tournament.players.length >= 2 && (
-        <section className="panel">
-          <h2 title={S.teamGroupTitle}>{S.teamGroup}</h2>
-          <p className="hint" title={S.teamGroupHintTitle}>
-            {S.teamGroupHint}
-          </p>
+        <CollapsiblePanel title={S.teamGroup} titleTitle={S.teamGroupTitle} compact>
           {tournament.teams.map((team, idx) => (
             <article key={team.id} className="team-card">
               <label title={S.teamNTitle(idx + 1)}>{S.teamN(idx + 1)}</label>
@@ -174,12 +298,11 @@ export function SetupPanel() {
               {S.autoPair}
             </button>
           </p>
-        </section>
+        </CollapsiblePanel>
       )}
 
       {tournament.groups.length > 0 && (
-        <section className="panel">
-          <h2>{S.groupAssignment}</h2>
+        <CollapsiblePanel title={S.groupAssignment}>
           {tournament.groups.map((g) => (
             <article key={g.id} className="team-card">
               <label>
@@ -195,14 +318,14 @@ export function SetupPanel() {
                     <span key={id}>
                       {i > 0 && S.groupMemberSeparator}
                       {p ? (
-                        <PlayerLabel player={p} compact />
+                        <PlayerLabel player={p} compact showGender={genderVisible} />
                       ) : team ? (
                         team.playerIds.map((pid, j) => {
                           const pl = tournament.players.find((x) => x.id === pid);
                           return pl ? (
                             <span key={pid}>
                               {j > 0 && ' / '}
-                              <PlayerLabel player={pl} compact />
+                              <PlayerLabel player={pl} compact showGender={genderVisible} />
                             </span>
                           ) : null;
                         })
@@ -215,11 +338,10 @@ export function SetupPanel() {
               </p>
             </article>
           ))}
-        </section>
+        </CollapsiblePanel>
       )}
 
-      <section className="panel">
-        <h2 title={S.scheduleTitle}>{S.schedule}</h2>
+      <CollapsiblePanel title={S.schedule} titleTitle={S.scheduleTitle} compact>
         <p className="stats-bar">
           <span className="stat-pill">
             {S.statPlayers} <strong>{tournament.players.length}</strong>
@@ -232,9 +354,43 @@ export function SetupPanel() {
           <span className="stat-pill">
             {S.statMatches} <strong>{matchCount}</strong>
           </span>
+          <span className="stat-pill" title={S.bestOfTitle}>
+            {S.bestOf} <strong>{bestOfSummary}</strong>
+          </span>
         </p>
         {error && <p className="error-banner">{error}</p>}
-        <p className="btn-row">
+        <div className="panel-field-row">
+          <h2 className="panel-field-label" title={S.scheduleSeedTitle}>
+            {S.scheduleSeed}
+          </h2>
+          <div className="panel-field-control">
+            <section
+              className="mode-toggle mode-toggle-2"
+              role="group"
+              aria-label={S.scheduleSeed}
+            >
+              <button
+                type="button"
+                className={
+                  tournament.scheduleSeedMode === 'sequential' ? 'active' : ''
+                }
+                onClick={() => setScheduleSeedMode('sequential')}
+                title={S.scheduleSeedSequentialTitle}
+              >
+                {S.scheduleSeedSequential}
+              </button>
+              <button
+                type="button"
+                className={tournament.scheduleSeedMode === 'random' ? 'active' : ''}
+                onClick={() => setScheduleSeedMode('random')}
+                title={S.scheduleSeedRandomTitle}
+              >
+                {S.scheduleSeedRandom}
+              </button>
+            </section>
+          </div>
+        </div>
+        <p className="btn-row btn-row-actions">
           <button
             type="button"
             className="btn-primary"
@@ -255,17 +411,17 @@ export function SetupPanel() {
             </button>
           )}
         </p>
-        {tournament.matches.length > 0 && (
-          <p className="hint" style={{ marginTop: '0.5rem' }} title={S.regenWarningTitle}>
-            {S.regenWarning}
-          </p>
-        )}
-      </section>
+      </CollapsiblePanel>
 
       {tournament.matches.length > 0 && (
         <ScheduleOverview
           mode={tournament.mode}
           scheduleFormat={tournament.scheduleFormat}
+          category={tournament.category}
+          bestOfMode={tournament.bestOfMode}
+          bestOf={tournament.bestOf}
+          customBestOfDefault={tournament.customBestOfDefault}
+          customBestOfFinal={tournament.customBestOfFinal}
           players={tournament.players}
           teams={tournament.teams}
           groups={tournament.groups}

@@ -6,6 +6,7 @@ import { GenderSymbol } from './GenderSymbol';
 export function renderSideCompactLabel(
   sideIds: string[],
   players: Player[],
+  showGender = true,
 ): ReactNode {
   return (
     <>
@@ -18,7 +19,13 @@ export function renderSideCompactLabel(
               '?'
             ) : (
               <>
-                {p.name} <GenderSymbol gender={p.gender} />
+                {p.name}
+                {showGender && (
+                  <>
+                    {' '}
+                    <GenderSymbol gender={p.gender} />
+                  </>
+                )}
               </>
             )}
           </Fragment>

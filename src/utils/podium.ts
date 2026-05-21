@@ -1,7 +1,10 @@
 import type { Match, Tournament } from '../types';
-import { resolveMatchSides } from './knockout';
+import { resolveMatchBestOf } from './bestOf';
+import { resolveMatchSides, type ResolveSidesTournament } from './knockout';
+import { getMatchWinnerSide } from './matchOutcome';
 import { computeStandings } from './ranking';
 import { formatSideCompactLabel } from './player';
+import { showPlayerGender } from './tournamentCategory';
 import { isMatchPlayed } from './score';
 
 export interface PodiumPlace {
@@ -16,18 +19,19 @@ function entityKey(ids: string[]): string {
 
 function matchSides(
   m: Match,
-  tournament: Pick<
-    Tournament,
-    'matches' | 'mode' | 'players' | 'teams' | 'groups' | 'scheduleFormat'
-  >,
+  tournament: ResolveSidesTournament,
 ): { winnerIds: string[]; loserIds: string[] } | null {
-  if (!isMatchPlayed(m) || m.scoreA === null || m.scoreB === null) return null;
-  const resolved = resolveMatchSides(m, tournament, formatSideCompactLabel);
+  if (!isMatchPlayed(m)) return null;
+  const showGender = showPlayerGender(tournament.category);
+  const resolved = resolveMatchSides(m, tournament, (ids, players) =>
+    formatSideCompactLabel(ids, players, showGender),
+  );
   if (!resolved.ready) return null;
-  if (m.scoreA > m.scoreB) {
+  const winnerSide = getMatchWinnerSide(m, resolveMatchBestOf(m, tournament));
+  if (winnerSide === 'A') {
     return { winnerIds: resolved.sideAIds, loserIds: resolved.sideBIds };
   }
-  if (m.scoreB > m.scoreA) {
+  if (winnerSide === 'B') {
     return { winnerIds: resolved.sideBIds, loserIds: resolved.sideAIds };
   }
   return null;
@@ -62,6 +66,7 @@ function computeRoundRobinPodium(tournament: Tournament): PodiumPlace[] | null {
     tournament.players,
     tournament.teams,
     tournament.matches,
+    tournament,
   );
   if (standings.length === 0) return null;
 

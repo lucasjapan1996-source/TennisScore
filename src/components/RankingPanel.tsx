@@ -9,14 +9,24 @@ import { isMatchPlayed } from '../utils/score';
 import { withoutThirdPlaceMatches } from '../utils/schedule';
 import { PodiumDisplay } from './PodiumDisplay';
 import { renderStandingName } from './PlayerLabel';
-import { S } from '../strings';
+import { useStrings } from '../hooks/useStrings';
 import type { MatchMode, Player, StandingRow, Team } from '../types';
+import { showPlayerGender } from '../utils/tournamentCategory';
+import { CollapsiblePanel } from './CollapsiblePanel';
 
 export function RankingPanel() {
+  const S = useStrings();
   const { tournament, setActiveTab } = useTournamentStore();
   const isGroupStage = tournament.scheduleFormat === 'group_stage';
   const isKnockoutOnly = tournament.scheduleFormat === 'knockout';
   const isSingles = tournament.mode === 'singles';
+  const genderVisible = showPlayerGender(tournament.category);
+  const categoryLabel =
+    tournament.category === 'women'
+      ? S.categoryWomen
+      : tournament.category === 'mixed'
+        ? S.categoryMixed
+        : S.categoryMen;
 
   const activeMatches = useMemo(
     () => withoutThirdPlaceMatches(tournament.matches, tournament.scheduleFormat),
@@ -35,6 +45,7 @@ export function RankingPanel() {
             tournament.players,
             tournament.teams,
             activeMatches,
+            tournament,
           )
         : [],
     [
@@ -55,6 +66,7 @@ export function RankingPanel() {
             tournament.players,
             tournament.teams,
             activeMatches,
+            tournament,
           )
         : [],
     [
@@ -89,40 +101,36 @@ export function RankingPanel() {
     );
   }
 
-  const rankHint = isGroupStage
-    ? S.rankingGroupStageHint
-    : isKnockoutOnly
-      ? S.combinedRankHintKnockout
-      : S.rankRule;
-
   return (
     <>
       {podium && (
-        <section className="panel podium-panel">
+        <CollapsiblePanel
+          title={S.podiumTitle}
+          titleTitle={S.podiumTitle}
+          compact
+          className="podium-panel"
+        >
           <PodiumDisplay
             places={podium}
             players={tournament.players}
             teams={tournament.teams}
             mode={tournament.mode}
+            showGender={genderVisible}
           />
-          <p className="hint podium-hint">
-            {isGroupStage
-              ? S.podiumHint
-              : isKnockoutOnly
-                ? S.podiumHintKnockout
-                : S.podiumHintRoundRobin}
-          </p>
-        </section>
+        </CollapsiblePanel>
       )}
 
-      <section className="panel">
-        <h2 title={S.rankingTitle}>
-          {isGroupStage
+      <CollapsiblePanel
+        title={
+          isGroupStage
             ? S.rankingGroupStage
             : isKnockoutOnly
               ? S.rankingKnockout
-              : S.ranking}
-        </h2>
+              : S.ranking
+        }
+        titleTitle={S.rankingTitle}
+        compact
+      >
         <p className="stats-bar">
           <span className="stat-pill">
             {S.finishedMatches(finished, activeMatches.length)}
@@ -131,15 +139,18 @@ export function RankingPanel() {
             {S.modeStat}{' '}
             <strong>{isSingles ? S.singles : S.doubles}</strong>
           </span>
+          <span className="stat-pill">
+            {S.categoryStat}{' '}
+            <strong>{categoryLabel}</strong>
+          </span>
         </p>
-        <p className="hint" title={S.rankRuleTitle}>
-          {rankHint}
-        </p>
-      </section>
+      </CollapsiblePanel>
 
       {isGroupStage || isKnockoutOnly ? (
-        <section className="panel group-standings-panel">
-          <h3 className="group-rank-title">{S.groupStandingsAll}</h3>
+        <CollapsiblePanel
+          title={S.groupStandingsAll}
+          className="group-standings-panel"
+        >
           {combinedStandings.length === 0 ? (
             <p className="empty-state">{S.noData}</p>
           ) : (
@@ -149,25 +160,27 @@ export function RankingPanel() {
               players={tournament.players}
               teams={tournament.teams}
               mode={tournament.mode}
+              showGender={genderVisible}
             />
           )}
-        </section>
+        </CollapsiblePanel>
       ) : roundRobinStandings.length === 0 ? (
-        <section className="panel">
+        <CollapsiblePanel title={S.ranking} titleTitle={S.rankingTitle}>
           <p className="empty-state" title={S.noDataTitle}>
             {S.noData}
           </p>
-        </section>
+        </CollapsiblePanel>
       ) : (
-        <section className="panel">
+        <CollapsiblePanel title={S.ranking} titleTitle={S.rankingTitle}>
           <StandingsTable
             rows={roundRobinStandings}
             isSingles={isSingles}
             players={tournament.players}
             teams={tournament.teams}
             mode={tournament.mode}
+            showGender={genderVisible}
           />
-        </section>
+        </CollapsiblePanel>
       )}
     </>
   );
@@ -179,13 +192,16 @@ function StandingsTable({
   players,
   teams,
   mode,
+  showGender,
 }: {
   rows: StandingRow[];
   isSingles: boolean;
   players: Player[];
   teams: Team[];
   mode: MatchMode;
+  showGender: boolean;
 }) {
+  const S = useStrings();
   return (
     <div className="rank-table-wrap">
       <table className="rank-table rank-table-minimal" title={S.tableTitle}>
@@ -217,7 +233,7 @@ function StandingsTable({
                   {row.rank}
                 </span>
               </td>
-              <td>{renderStandingName(row.id, players, mode, teams)}</td>
+              <td>{renderStandingName(row.id, players, mode, teams, showGender)}</td>
               <td className="num diff-cell">
                 {row.gameDiff > 0 ? '+' : ''}
                 {row.gameDiff}

@@ -1,4 +1,28 @@
-import type { Match } from '../types';
+import { getActiveStrings } from '../i18n';
+import type { BestOf, Match, SetScore } from '../types';
+import { isRetired } from './matchOutcome';
+import { countSetWins, isCompleteSetScore, isMatchDecided } from './sets';
+
+export function setsToWin(bestOf: BestOf): number {
+  return Math.ceil(bestOf / 2);
+}
+
+/** 校验已录入的比分是否符合 bo 赛制 */
+export function isValidMatchScore(
+  scoreA: number,
+  scoreB: number,
+  bestOf: BestOf,
+): boolean {
+  if (scoreA === scoreB) return false;
+  if (bestOf === 1) {
+    return scoreA >= 0 && scoreB >= 0;
+  }
+  const win = setsToWin(bestOf);
+  const maxLoser = bestOf - win;
+  const hi = Math.max(scoreA, scoreB);
+  const lo = Math.min(scoreA, scoreB);
+  return hi === win && lo >= 0 && lo <= maxLoser;
+}
 
 export function parseSmallScore(raw: string): number {
   const t = raw.trim();
@@ -26,12 +50,63 @@ export function formatMatchScoreForRow(m: Match, rowSideIds: string[]): string {
   return `${formatSideScore(m.scoreB, m.tiebreakB)} : ${formatSideScore(m.scoreA, m.tiebreakA)}`;
 }
 
+function formatSetLine(s: SetScore): string {
+  return `${formatSideScore(s.gamesA, s.tiebreakA)}-${formatSideScore(s.gamesB, s.tiebreakB)}`;
+}
+
 export function formatMatchScore(m: Match): string {
   if (m.isBye) return '';
+  if (isRetired(m)) {
+    const S = getActiveStrings();
+    const completedSets = (m.sets ?? []).filter(isCompleteSetScore);
+    const showScore =
+      m.scoreA !== null &&
+      m.scoreB !== null &&
+      (completedSets.length > 0 ||
+        m.tiebreakA > 0 ||
+        m.tiebreakB > 0 ||
+        m.scoreA + m.scoreB > 3);
+    if (showScore) {
+      return `${m.scoreA}:${m.scoreB} ${S.retiredTag}`;
+    }
+    return S.retiredTag;
+  }
+  const completedSets = (m.sets ?? []).filter(isCompleteSetScore);
+  if (completedSets.length > 0) {
+    const { winsA, winsB } = countSetWins(completedSets);
+    const detail = completedSets.map(formatSetLine).join(', ');
+    if (m.scoreA !== null && m.scoreB !== null) {
+      return `${m.scoreA}:${m.scoreB} (${detail})`;
+    }
+    return `${winsA}:${winsB} (${detail})`;
+  }
   if (m.scoreA === null || m.scoreB === null) return '';
   return `${formatSideScore(m.scoreA, m.tiebreakA)} : ${formatSideScore(m.scoreB, m.tiebreakB)}`;
 }
 
 export function isMatchPlayed(m: Match): boolean {
+  if (m.isBye) return false;
+  if (isRetired(m)) return true;
   return m.scoreA !== null && m.scoreB !== null;
+}
+
+export function applySetsToMatchScores(
+  sets: SetScore[],
+  bestOf: BestOf,
+): Pick<
+  Match,
+  'sets' | 'scoreA' | 'scoreB' | 'tiebreakA' | 'tiebreakB' | 'playedAt' | 'retiredSide'
+> {
+  const completed = sets.filter(isCompleteSetScore);
+  const { winsA, winsB } = countSetWins(completed);
+  const decided = isMatchDecided(completed, bestOf);
+  return {
+    sets: completed,
+    scoreA: decided ? winsA : null,
+    scoreB: decided ? winsB : null,
+    tiebreakA: 0,
+    tiebreakB: 0,
+    retiredSide: null,
+    playedAt: decided ? new Date().toISOString() : null,
+  };
 }

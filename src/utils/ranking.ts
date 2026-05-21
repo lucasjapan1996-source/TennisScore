@@ -1,4 +1,4 @@
-import { S } from '../strings';
+import { getActiveStrings } from '../i18n';
 import type {
   GroupAssignment,
   Match,
@@ -7,7 +7,15 @@ import type {
   StandingRow,
   Team,
 } from '../types';
+import type { BestOfTournamentFields, StandingTournamentFields } from './bestOf';
+import { resolveMatchBestOf } from './bestOf';
+import {
+  getMatchWinnerSide,
+  isRetired,
+  matchHasRecordedScore,
+} from './matchOutcome';
 import { formatPlayerLabel } from './player';
+import { showPlayerGender } from './tournamentCategory';
 
 interface EntityStats {
   id: string;
@@ -26,7 +34,7 @@ function getEntityLabel(
   teams: Team[],
 ): string {
   const names = ids.map(
-    (id) => players.find((p) => p.id === id)?.name ?? S.unknown,
+    (id) => players.find((p) => p.id === id)?.name ?? getActiveStrings().unknown,
   );
   if (mode === 'singles') return names[0];
   const team = teams.find(
@@ -36,7 +44,7 @@ function getEntityLabel(
   );
   if (team) {
     const teamNames = team.playerIds.map(
-      (pid) => players.find((p) => p.id === pid)?.name ?? S.unknown,
+      (pid) => players.find((p) => p.id === pid)?.name ?? getActiveStrings().unknown,
     );
     return teamNames.join(' / ');
   }
@@ -51,6 +59,7 @@ function buildEntities(
   mode: MatchMode,
   players: Player[],
   teams: Team[],
+  showGender: boolean,
 ): Map<string, EntityStats> {
   const map = new Map<string, EntityStats>();
 
@@ -58,7 +67,7 @@ function buildEntities(
     for (const p of players) {
       map.set(p.id, {
         id: p.id,
-        label: formatPlayerLabel(p),
+        label: formatPlayerLabel(p, showGender),
         played: 0,
         wins: 0,
         losses: 0,
@@ -72,7 +81,7 @@ function buildEntities(
       const label = t.playerIds
         .map((pid) => {
           const p = players.find((pl) => pl.id === pid);
-          return p ? formatPlayerLabel(p) : S.unknown;
+          return p ? formatPlayerLabel(p, showGender) : getActiveStrings().unknown;
         })
         .join(' / ');
       map.set(key, {
@@ -118,6 +127,7 @@ export function computeGroupStandings(
   teams: Team[],
   groups: GroupAssignment[],
   matches: Match[],
+  tournament: StandingTournamentFields,
 ): StandingRow[] {
   const group = groups.find((g) => g.id === groupId);
   if (!group) return [];
@@ -129,17 +139,40 @@ export function computeGroupStandings(
 
   if (mode === 'singles') {
     const subset = players.filter((p) => memberSet.has(p.id));
-    return computeStandings(mode, subset, [], groupMatches);
+    return computeStandings(mode, subset, [], groupMatches, tournament);
   }
 
   const subsetTeams = teams.filter((t) => memberSet.has(t.id));
-  return computeStandings(mode, players, subsetTeams, groupMatches);
+  return computeStandings(mode, players, subsetTeams, groupMatches, tournament);
 }
 
 function applyMatchToStats(
   stats: Map<string, EntityStats>,
   m: Match,
+  tournament: BestOfTournamentFields,
 ): void {
+  const bestOf = resolveMatchBestOf(m, tournament);
+
+  if (isRetired(m) && !matchHasRecordedScore(m, bestOf)) {
+    const winner = getMatchWinnerSide(m, bestOf);
+    if (!winner) return;
+    const keyA = entityKey(m.sideAIds);
+    const keyB = entityKey(m.sideBIds);
+    const a = stats.get(keyA);
+    const b = stats.get(keyB);
+    if (!a || !b) return;
+    a.played++;
+    b.played++;
+    if (winner === 'A') {
+      a.wins++;
+      b.losses++;
+    } else {
+      b.wins++;
+      a.losses++;
+    }
+    return;
+  }
+
   if (m.scoreA === null || m.scoreB === null) return;
 
   if (m.isBye) {
@@ -222,21 +255,26 @@ function finalizeStandingRows(
 }
 
 /** 小组赛 + 淘汰赛已录比分合并统计（用于总排名） */
+function isStandingMatch(m: Match): boolean {
+  if (m.phase === 'knockout' && m.isBye) return false;
+  if (isRetired(m)) return true;
+  return m.scoreA !== null && m.scoreB !== null;
+}
+
 export function computeGroupAndKnockoutStandings(
   mode: MatchMode,
   players: Player[],
   teams: Team[],
   matches: Match[],
+  tournament: StandingTournamentFields,
 ): StandingRow[] {
   const relevant = matches.filter(
-    (m) =>
-      (m.phase === 'group' || m.phase === 'knockout') &&
-      m.scoreA !== null &&
-      m.scoreB !== null,
+    (m) => (m.phase === 'group' || m.phase === 'knockout') && isStandingMatch(m),
   );
-  const stats = buildEntities(mode, players, teams);
+  const showGender = showPlayerGender(tournament.category);
+  const stats = buildEntities(mode, players, teams, showGender);
   for (const m of relevant) {
-    applyMatchToStats(stats, m);
+    applyMatchToStats(stats, m, tournament);
   }
   return finalizeStandingRows(stats, relevant);
 }
@@ -246,12 +284,16 @@ export function computeStandings(
   players: Player[],
   teams: Team[],
   matches: Match[],
+  tournament: StandingTournamentFields,
 ): StandingRow[] {
-  const relevant = matches.filter((m) => m.phase !== 'knockout');
-  const stats = buildEntities(mode, players, teams);
+  const relevant = matches.filter(
+    (m) => m.phase !== 'knockout' && isStandingMatch(m),
+  );
+  const showGender = showPlayerGender(tournament.category);
+  const stats = buildEntities(mode, players, teams, showGender);
 
   for (const m of relevant) {
-    applyMatchToStats(stats, m);
+    applyMatchToStats(stats, m, tournament);
   }
 
   return finalizeStandingRows(stats, relevant);
@@ -260,11 +302,12 @@ export function computeStandings(
 export function formatMatchSides(
   sideIds: string[],
   players: Player[],
+  showGender = true,
 ): string {
   return sideIds
     .map((id) => {
       const p = players.find((pl) => pl.id === id);
-      return p ? formatPlayerLabel(p) : S.unknown;
+      return p ? formatPlayerLabel(p, showGender) : getActiveStrings().unknown;
     })
     .join(' / ');
 }

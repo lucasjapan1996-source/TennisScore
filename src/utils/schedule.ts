@@ -4,6 +4,7 @@ import type {
   MatchMode,
   Player,
   ScheduleFormat,
+  ScheduleSeedMode,
   Team,
 } from '../types';
 import {
@@ -13,7 +14,7 @@ import {
   countPureKnockoutMatches,
   nextPowerOfTwo,
 } from './knockout';
-import { S } from '../strings';
+import { getActiveStrings } from '../i18n';
 
 function uid(): string {
   return crypto.randomUUID();
@@ -26,6 +27,10 @@ export function shuffle<T>(arr: T[]): T[] {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
+}
+
+export function orderEntities<T>(entities: T[], seedMode: ScheduleSeedMode): T[] {
+  return seedMode === 'random' ? shuffle(entities) : [...entities];
 }
 
 function allPairings<T>(entities: T[]): [T, T][] {
@@ -88,6 +93,8 @@ function emptyGroupMatch(
     scoreB: null,
     tiebreakA: 0,
     tiebreakB: 0,
+    sets: [],
+    retiredSide: null,
     playedAt: null,
     isBye: false,
   };
@@ -113,19 +120,22 @@ function emptyRoundRobinMatch(
     scoreB: null,
     tiebreakA: 0,
     tiebreakB: 0,
+    sets: [],
+    retiredSide: null,
     playedAt: null,
     isBye: false,
   };
 }
 
-export function assignRandomGroups<T>(
+export function assignGroups<T>(
   entities: T[],
   groupCount: number,
   idOf: (e: T) => string,
+  seedMode: ScheduleSeedMode,
 ): GroupAssignment[] {
-  const shuffled = shuffle(entities);
+  const ordered = orderEntities(entities, seedMode);
   const buckets: T[][] = Array.from({ length: groupCount }, () => []);
-  shuffled.forEach((e, i) => {
+  ordered.forEach((e, i) => {
     buckets[i % groupCount].push(e);
   });
   return buckets
@@ -134,6 +144,15 @@ export function assignRandomGroups<T>(
       memberIds: members.map((m) => idOf(m)),
     }))
     .filter((g) => g.memberIds.length > 0);
+}
+
+/** @deprecated 使用 assignGroups */
+export function assignRandomGroups<T>(
+  entities: T[],
+  groupCount: number,
+  idOf: (e: T) => string,
+): GroupAssignment[] {
+  return assignGroups(entities, groupCount, idOf, 'random');
 }
 
 export interface ScheduleResult {
@@ -163,13 +182,14 @@ export function buildRoundRobinSchedule(
   players: Player[],
   teams: Team[],
   mode: MatchMode,
+  seedMode: ScheduleSeedMode = 'random',
 ): ScheduleResult {
   if (mode === 'singles') {
-    const shuffled = shuffle(players);
-    const pairings = allPairings(shuffled);
-    const ordered = orderPairingsNoBackToBack(pairings, (p) => p.id);
+    const ordered = orderEntities(players, seedMode);
+    const pairings = allPairings(ordered);
+    const matchOrder = orderPairingsNoBackToBack(pairings, (p) => p.id);
     const { matches } = buildMatchesFromPairings(
-      ordered,
+      matchOrder,
       null,
       1,
       (p) => [p.id],
@@ -177,11 +197,11 @@ export function buildRoundRobinSchedule(
     return { matches, groups: [] };
   }
 
-  const shuffled = shuffle(teams);
-  const pairings = allPairings(shuffled);
-  const ordered = orderPairingsNoBackToBack(pairings, (t) => t.id);
+  const ordered = orderEntities(teams, seedMode);
+  const pairings = allPairings(ordered);
+  const matchOrder = orderPairingsNoBackToBack(pairings, (t) => t.id);
   const { matches } = buildMatchesFromPairings(
-    ordered,
+    matchOrder,
     null,
     1,
     (t) => [...t.playerIds],
@@ -194,9 +214,10 @@ export function buildGroupStageSchedule(
   teams: Team[],
   mode: MatchMode,
   groupCount: number,
+  seedMode: ScheduleSeedMode = 'random',
 ): ScheduleResult {
   if (mode === 'singles') {
-    const groups = assignRandomGroups(players, groupCount, (p) => p.id);
+    const groups = assignGroups(players, groupCount, (p) => p.id, seedMode);
     const matches: Match[] = [];
     let order = 1;
     for (const g of groups) {
@@ -204,10 +225,10 @@ export function buildGroupStageSchedule(
         .map((id) => players.find((p) => p.id === id))
         .filter((p): p is Player => !!p);
       if (members.length < 2) continue;
-      const pairings = allPairings(shuffle(members));
-      const ordered = orderPairingsNoBackToBack(pairings, (p) => p.id);
+      const pairings = allPairings(orderEntities(members, seedMode));
+      const matchOrder = orderPairingsNoBackToBack(pairings, (p) => p.id);
       const built = buildMatchesFromPairings(
-        ordered,
+        matchOrder,
         g.id,
         order,
         (p) => [p.id],
@@ -215,12 +236,12 @@ export function buildGroupStageSchedule(
       matches.push(...built.matches);
       order = built.nextOrder;
     }
-    const knockout = buildKnockoutMatches(groups, order);
+    const knockout = buildKnockoutMatches(groups, order, seedMode);
     matches.push(...knockout.matches);
     return { matches, groups };
   }
 
-  const groups = assignRandomGroups(teams, groupCount, (t) => t.id);
+  const groups = assignGroups(teams, groupCount, (t) => t.id, seedMode);
   const matches: Match[] = [];
   let order = 1;
   for (const g of groups) {
@@ -228,10 +249,10 @@ export function buildGroupStageSchedule(
       .map((id) => teams.find((t) => t.id === id))
       .filter((t): t is Team => !!t);
     if (members.length < 2) continue;
-    const pairings = allPairings(shuffle(members));
-    const ordered = orderPairingsNoBackToBack(pairings, (t) => t.id);
+    const pairings = allPairings(orderEntities(members, seedMode));
+    const matchOrder = orderPairingsNoBackToBack(pairings, (t) => t.id);
     const built = buildMatchesFromPairings(
-      ordered,
+      matchOrder,
       g.id,
       order,
       (t) => [...t.playerIds],
@@ -239,7 +260,7 @@ export function buildGroupStageSchedule(
     matches.push(...built.matches);
     order = built.nextOrder;
   }
-  const knockout = buildKnockoutMatches(groups, order);
+  const knockout = buildKnockoutMatches(groups, order, seedMode);
   matches.push(...knockout.matches);
   return { matches, groups };
 }
@@ -333,20 +354,20 @@ export function validateBeforeSchedule(
   scheduleFormat: ScheduleFormat,
   groupCount: number,
 ): string | null {
-  if (players.length < 2) return S.errMinPlayers;
+  if (players.length < 2) return getActiveStrings().errMinPlayers;
   if (mode === 'doubles') {
-    if (players.length % 2 !== 0) return S.errDoublesEven;
-    if (teams.length < 2) return S.errMinTeams;
+    if (players.length % 2 !== 0) return getActiveStrings().errDoublesEven;
+    if (teams.length < 2) return getActiveStrings().errMinTeams;
     const used = new Set(teams.flatMap((t) => t.playerIds));
-    if (used.size !== players.length) return S.errTeamCoverage;
+    if (used.size !== players.length) return getActiveStrings().errTeamCoverage;
   }
   if (scheduleFormat === 'group_stage') {
     const entityCount = mode === 'singles' ? players.length : teams.length;
-    if (groupCount < 2) return S.errMinGroups;
-    if (groupCount > entityCount) return S.errGroupsTooMany;
+    if (groupCount < 2) return getActiveStrings().errMinGroups;
+    if (groupCount > entityCount) return getActiveStrings().errGroupsTooMany;
     const minPerGroup = Math.floor(entityCount / groupCount);
     if (minPerGroup < 2 && entityCount < groupCount * 2) {
-      return S.errGroupsTooSmall;
+      return getActiveStrings().errGroupsTooSmall;
     }
   }
   if (scheduleFormat === 'knockout' || scheduleFormat === 'group_stage') {
@@ -355,7 +376,7 @@ export function validateBeforeSchedule(
       scheduleFormat === 'knockout'
         ? nextPowerOfTwo(entityCount)
         : nextPowerOfTwo(groupCount);
-    if (bracketSize > 32) return S.errKnockoutTooMany;
+    if (bracketSize > 32) return getActiveStrings().errKnockoutTooMany;
   }
   return null;
 }
@@ -364,7 +385,8 @@ export function buildKnockoutOnlySchedule(
   players: Player[],
   teams: Team[],
   mode: MatchMode,
+  seedMode: ScheduleSeedMode = 'random',
 ): ScheduleResult {
-  const result = buildPureKnockoutSchedule(players, teams, mode);
+  const result = buildPureKnockoutSchedule(players, teams, mode, seedMode);
   return { matches: result.matches, groups: [] };
 }

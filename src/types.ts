@@ -1,6 +1,18 @@
 export type MatchMode = 'singles' | 'doubles';
 
+/** 赛事类别：男子 / 女子 / 混合（仅混合赛录入与展示性别） */
+export type TournamentCategory = 'men' | 'women' | 'mixed';
+
 export type ScheduleFormat = 'round_robin' | 'group_stage' | 'knockout';
+
+/** 生成对阵时的签位/分组顺序 */
+export type ScheduleSeedMode = 'sequential' | 'random';
+
+/** 每场对阵赛制：bo1 一局定胜负；bo3/bo5 录入双方赢下的局（盘）数 */
+export type BestOf = 1 | 3 | 5;
+
+/** 统一全场 bo，或按「其他 / 决赛」自定义 */
+export type BestOfMode = 'uniform' | 'custom';
 
 export type TabId = 'players' | 'setup' | 'matches' | 'rankings';
 
@@ -45,6 +57,14 @@ export interface GroupAssignment {
   memberIds: string[];
 }
 
+/** 单局比分（大分=局内胜局数，小分=抢七） */
+export interface SetScore {
+  gamesA: number;
+  gamesB: number;
+  tiebreakA: number;
+  tiebreakB: number;
+}
+
 export interface Match {
   id: string;
   phase: MatchPhase;
@@ -62,6 +82,10 @@ export interface Match {
   scoreB: number | null;
   tiebreakA: number;
   tiebreakB: number;
+  /** bo3/bo5 逐局明细；bo1 为空数组 */
+  sets: SetScore[];
+  /** 退赛方：A 或 B 退赛，对方直接获胜 */
+  retiredSide: 'A' | 'B' | null;
   playedAt: string | null;
   /** 轮空直接晋级，无需录入比分 */
   isBye: boolean;
@@ -70,8 +94,20 @@ export interface Match {
 export interface Tournament {
   id: string;
   name: string;
+  /** 赛事说明（规则、地点、备注等） */
+  description: string;
+  category: TournamentCategory;
   mode: MatchMode;
   scheduleFormat: ScheduleFormat;
+  /** 生成对阵：按球员列表顺序，或随机打乱 */
+  scheduleSeedMode: ScheduleSeedMode;
+  bestOfMode: BestOfMode;
+  /** 统一赛制时使用 */
+  bestOf: BestOf;
+  /** 自定义：小组赛、淘汰非决赛等 */
+  customBestOfDefault: BestOf;
+  /** 自定义：淘汰赛决赛 */
+  customBestOfFinal: BestOf;
   groupCount: number;
   groups: GroupAssignment[];
   players: Player[];
@@ -95,8 +131,16 @@ export interface StandingRow {
 
 export const PLAYER_LEVELS: PlayerLevel[] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
+export const DEFAULT_TOURNAMENT_CATEGORY: TournamentCategory = 'men';
+
 export const DEFAULT_PLAYER_GENDER: PlayerGender = 'male';
 
 export const DEFAULT_PLAYER_LEVEL: PlayerLevel = 3;
 
 export const DEFAULT_GROUP_COUNT = 2;
+export const DEFAULT_SCHEDULE_SEED_MODE: ScheduleSeedMode = 'random';
+
+export const DEFAULT_BEST_OF: BestOf = 1;
+export const DEFAULT_BEST_OF_MODE: BestOfMode = 'uniform';
+export const DEFAULT_CUSTOM_BEST_OF_DEFAULT: BestOf = 3;
+export const DEFAULT_CUSTOM_BEST_OF_FINAL: BestOf = 5;

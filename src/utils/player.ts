@@ -6,7 +6,7 @@ import {
   type PlayerGender,
   type PlayerLevel,
 } from '../types';
-import { S } from '../strings';
+import { getActiveStrings } from '../i18n';
 import { genderSymbol } from './gender';
 export function isPlayerLevel(n: number): n is PlayerLevel {
   return PLAYER_LEVELS.includes(n as PlayerLevel);
@@ -28,24 +28,37 @@ export function normalizePlayers(players: Array<Partial<Player> & { id: string; 
   return players.map(normalizePlayer);
 }
 
-export function formatPlayerLabel(player: Player): string {
-  return `${player.name} ${genderSymbol(player.gender)} ${S.levelLabel(player.level)}`;
+export function formatPlayerLabel(
+  player: Player,
+  showGender = true,
+): string {
+  const parts = [player.name];
+  if (showGender) parts.push(genderSymbol(player.gender));
+  parts.push(getActiveStrings().levelLabel(player.level));
+  return parts.join(' ');
 }
 
-export function formatPlayerBadge(player: Player): string {
-  return `${genderSymbol(player.gender)} ${S.levelLabel(player.level)}`;
+export function formatPlayerBadge(
+  player: Player,
+  showGender = true,
+): string {
+  const parts: string[] = [];
+  if (showGender) parts.push(genderSymbol(player.gender));
+  parts.push(getActiveStrings().levelLabel(player.level));
+  return parts.join(' ');
 }
 
 /** 比分卡片用：姓名 + 性别符号（纯文本，供回调兼容） */
 export function formatSideCompactLabel(
   sideIds: string[],
   players: Player[],
+  showGender = true,
 ): string {
   return sideIds
     .map((id) => {
       const p = players.find((pl) => pl.id === id);
       if (!p) return '?';
-      return `${p.name} ${genderSymbol(p.gender)}`;
+      return showGender ? `${p.name} ${genderSymbol(p.gender)}` : p.name;
     })
     .join('/');
 }

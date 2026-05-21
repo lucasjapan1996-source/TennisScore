@@ -1,7 +1,20 @@
 import { useMemo } from 'react';
-import type { GroupAssignment, Match, MatchMode, Player, ScheduleFormat, Team, Tournament } from '../types';
+import { CollapsiblePanel } from './CollapsiblePanel';
+import type {
+  BestOf,
+  BestOfMode,
+  GroupAssignment,
+  Match,
+  MatchMode,
+  Player,
+  ScheduleFormat,
+  Team,
+  TournamentCategory,
+} from '../types';
+import type { ResolveSidesTournament } from '../utils/knockout';
 import { groupMatchesBySection, matchPairKey } from '../utils/schedule';
 import { formatSideCompactLabel } from '../utils/player';
+import { showPlayerGender } from '../utils/tournamentCategory';
 import { renderMatchSides } from './PlayerLabel';
 import { knockoutMatchLabel, resolveMatchSides } from '../utils/knockout';
 import {
@@ -9,11 +22,17 @@ import {
   formatMatchScoreForRow,
   isMatchPlayed,
 } from '../utils/score';
-import { S } from '../strings';
+import { getActiveStrings } from '../i18n';
+import { useStrings } from '../hooks/useStrings';
 
 interface ScheduleOverviewProps {
   mode: MatchMode;
   scheduleFormat: ScheduleFormat;
+  category: TournamentCategory;
+  bestOfMode: BestOfMode;
+  bestOf: BestOf;
+  customBestOfDefault: BestOf;
+  customBestOfFinal: BestOf;
   players: Player[];
   teams: Team[];
   groups: GroupAssignment[];
@@ -47,6 +66,7 @@ function buildMatrixEntities(
 }
 
 function sectionTitle(key: string): string {
+  const S = getActiveStrings();
   if (key === 'knockout') return S.sectionKnockout;
   if (key === 'all') return S.sectionAllMatches;
   return S.groupLabel(Number(key.slice(1)));
@@ -55,14 +75,36 @@ function sectionTitle(key: string): string {
 export function ScheduleOverview({
   mode,
   scheduleFormat,
+  category,
+  bestOfMode,
+  bestOf,
+  customBestOfDefault,
+  customBestOfFinal,
   players,
   teams,
   groups,
   matches,
   onGoScore,
 }: ScheduleOverviewProps) {
+  const resolveCtx: ResolveSidesTournament = {
+    matches,
+    mode,
+    players,
+    teams,
+    groups,
+    scheduleFormat,
+    category,
+    bestOfMode,
+    bestOf,
+    customBestOfDefault,
+    customBestOfFinal,
+  };
+  const S = useStrings();
   const isGroupStage = scheduleFormat === 'group_stage';
   const isKnockoutOnly = scheduleFormat === 'knockout';
+  const genderVisible = showPlayerGender(category);
+  const compactLabel = (sideIds: string[], pls: Player[]) =>
+    formatSideCompactLabel(sideIds, pls, genderVisible);
 
   const bySection = useMemo(() => {
     const grouped = groupMatchesBySection(matches, scheduleFormat);
@@ -94,8 +136,12 @@ export function ScheduleOverview({
   const doneCount = matches.filter((m) => isMatchPlayed(m)).length;
 
   return (
-    <section className="panel schedule-panel">
-      <h2 title={S.fullScheduleTitle}>{S.fullSchedule}</h2>
+    <CollapsiblePanel
+      title={S.fullSchedule}
+      titleTitle={S.fullScheduleTitle}
+      className="schedule-panel"
+      defaultOpen={false}
+    >
       <p className="stats-bar">
         <span className="stat-pill">
           {S.scheduleTotal} <strong>{matches.length}</strong>
@@ -121,7 +167,6 @@ export function ScheduleOverview({
       {!isGroupStage && !isKnockoutOnly && entities.length >= 2 && entities.length <= 10 && (
         <details className="schedule-matrix-wrap" open={entities.length <= 6}>
           <summary title={S.matrixTitle}>{S.matrix}</summary>
-          <p className="hint">{S.matrixHint}</p>
           <div className="matrix-scroll">
             <table className="matrix-table">
               <thead>
@@ -206,23 +251,43 @@ export function ScheduleOverview({
             )}
             <ol className="schedule-match-list">
               {sectionMatches.map((m) => {
-                const ctx: Pick<
-                  Tournament,
-                  'matches' | 'mode' | 'players' | 'teams' | 'groups' | 'scheduleFormat'
-                > = { matches, mode, players, teams, groups, scheduleFormat };
-                const resolved = resolveMatchSides(m, ctx, formatSideCompactLabel);
+                const resolved = resolveMatchSides(m, resolveCtx, compactLabel);
                 const sideA =
                   resolved.ready && m.sideAIds.length > 0
-                    ? renderMatchSides(m.sideAIds, players, mode, teams)
+                    ? renderMatchSides(
+                        m.sideAIds,
+                        players,
+                        mode,
+                        teams,
+                        genderVisible,
+                      )
                     : m.phase === 'knockout'
                       ? resolved.labelA
-                      : renderMatchSides(m.sideAIds, players, mode, teams);
+                      : renderMatchSides(
+                          m.sideAIds,
+                          players,
+                          mode,
+                          teams,
+                          genderVisible,
+                        );
                 const sideB =
                   resolved.ready && m.sideBIds.length > 0
-                    ? renderMatchSides(m.sideBIds, players, mode, teams)
+                    ? renderMatchSides(
+                        m.sideBIds,
+                        players,
+                        mode,
+                        teams,
+                        genderVisible,
+                      )
                     : m.phase === 'knockout'
                       ? resolved.labelB
-                      : renderMatchSides(m.sideBIds, players, mode, teams);
+                      : renderMatchSides(
+                          m.sideBIds,
+                          players,
+                          mode,
+                          teams,
+                          genderVisible,
+                        );
                 const score = m.isBye ? S.knockoutByeShort : formatMatchScore(m);
                 const done = m.isBye || score !== '';
                 const stageLabel =
@@ -265,7 +330,7 @@ export function ScheduleOverview({
           </button>
         </p>
       )}
-    </section>
+    </CollapsiblePanel>
   );
 }
 

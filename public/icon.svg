@@ -1,6 +1,34 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#1a5f3c"/>
-  <circle cx="256" cy="256" r="140" fill="none" stroke="#f4e4bc" stroke-width="28"/>
-  <path d="M120 180 Q200 120 280 200" fill="none" stroke="#f4e4bc" stroke-width="20" stroke-linecap="round"/>
-  <ellipse cx="256" cy="256" rx="18" ry="140" fill="none" stroke="#c8e6d0" stroke-width="8" opacity="0.5"/>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e7a4f"/>
+      <stop offset="100%" stop-color="#145a38"/>
+    </linearGradient>
+    <radialGradient id="ball" cx="40%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#f4ff9e"/>
+      <stop offset="100%" stop-color="#b8d42a"/>
+    </radialGradient>
+    <filter id="shadow" x="-12%" y="-12%" width="124%" height="124%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#000" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="108" fill="url(#bg)"/>
+  <g fill="#f8fcf6" filter="url(#shadow)">
+    <path d="M197 336 L160 443 L181 454 L213 347 Z"/>
+    <path d="M224 336 L272 454 L293 443 L245 336 Z"/>
+    <path d="M256 219 C309 234 326 294 294 336 L245 325 C208 299 197 251 229 219 Z"/>
+    <path d="M234 219 L154 155 L128 112 L144 96 L176 139 L224 208 Z"/>
+    <ellipse cx="112" cy="101" rx="32" ry="77" transform="rotate(-32 112 101)"/>
+    <ellipse cx="293" cy="171" rx="51" ry="55" transform="rotate(18 293 171)"/>
+    <path d="M272 208 L352 80 L371 91 L283 219 Z"/>
+  </g>
+  <circle cx="373" cy="75" r="28" fill="url(#ball)"/>
+  <path
+    fill="none"
+    stroke="#fff"
+    stroke-width="7"
+    stroke-linecap="round"
+    opacity="0.9"
+    d="M373 47 C354 62 354 88 373 103 M373 47 C392 62 392 88 373 103"
+  />
 </svg>

@@ -1,22 +1,26 @@
 import { Fragment, type ReactNode } from 'react';
 import type { MatchMode, Player, Team } from '../types';
-import { S } from '../strings';
+import { getActiveStrings } from '../i18n';
+import { useStrings } from '../hooks/useStrings';
 import { GenderSymbol } from './GenderSymbol';
 
 export function PlayerLabel({
   player,
   showLevel = false,
   compact = false,
+  showGender = true,
 }: {
   player: Player;
   showLevel?: boolean;
   compact?: boolean;
+  showGender?: boolean;
 }) {
+  const S = useStrings();
   return (
     <span className="player-label">
       {player.name}
-      {!compact && ' '}
-      <GenderSymbol gender={player.gender} />
+      {!compact && showGender && ' '}
+      <GenderSymbol gender={player.gender} visible={showGender} />
       {showLevel && (
         <>
           {' '}
@@ -36,12 +40,18 @@ export function renderMatchSides(
   players: Player[],
   mode: MatchMode,
   teams: Team[] = [],
+  showGender = true,
 ): ReactNode {
+  const S = getActiveStrings();
   if (sideIds.length === 0) return S.unknown;
 
   if (mode === 'singles') {
     const p = players.find((pl) => pl.id === sideIds[0]);
-    return p ? <PlayerLabel player={p} showLevel /> : S.unknown;
+    return p ? (
+      <PlayerLabel player={p} showLevel showGender={showGender} />
+    ) : (
+      S.unknown
+    );
   }
 
   const team = teams.find(
@@ -57,7 +67,11 @@ export function renderMatchSides(
     return (
       <Fragment key={pid}>
         {i > 0 && ' / '}
-        {p ? <PlayerLabel player={p} compact /> : S.unknown}
+        {p ? (
+          <PlayerLabel player={p} compact showGender={showGender} />
+        ) : (
+          S.unknown
+        )}
       </Fragment>
     );
   });
@@ -68,10 +82,16 @@ export function renderStandingName(
   players: Player[],
   mode: MatchMode,
   teams: Team[] = [],
+  showGender = true,
 ): ReactNode {
+  const S = getActiveStrings();
   if (mode === 'singles') {
     const p = players.find((pl) => pl.id === entityId);
-    return p ? <PlayerLabel player={p} showLevel /> : entityId;
+    return p ? (
+      <PlayerLabel player={p} showLevel showGender={showGender} />
+    ) : (
+      entityId
+    );
   }
 
   const team = teams.find(
@@ -84,7 +104,11 @@ export function renderStandingName(
     return (
       <Fragment key={pid}>
         {i > 0 && ' / '}
-        {p ? <PlayerLabel player={p} compact /> : S.unknown}
+        {p ? (
+          <PlayerLabel player={p} compact showGender={showGender} />
+        ) : (
+          S.unknown
+        )}
       </Fragment>
     );
   });
