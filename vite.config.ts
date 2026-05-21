@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['djokovic-logo.png', 'icon-512.png'],
       manifest: {
-        name: '网球比赛计分',
-        short_name: '网球计分',
+        name: 'Tennis Score',
+        short_name: 'Tennis Score',
         description: '单打/双打循环赛对阵、比分与排名',
         theme_color: '#9db86e',
         background_color: '#0f1419',
