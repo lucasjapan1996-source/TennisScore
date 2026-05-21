@@ -92,24 +92,26 @@ export default function App() {
         )}
       </main>
 
-      <footer className="app-footer" title={S.copyrightLine}>
-        <p>{S.copyrightLine}</p>
-      </footer>
+      <div className="app-bottom-chrome">
+        <footer className="app-footer" title={S.copyrightLine}>
+          <p>{S.copyrightLine}</p>
+        </footer>
 
-      <nav className="tab-bar" aria-label="Main navigation">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            className={activeTab === tab.id ? 'active' : ''}
-            title={tab.title}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            <span className="icon">{tab.icon}</span>
-            <span className="tab-label">{tab.label}</span>
-          </button>
-        ))}
-      </nav>
+        <nav className="tab-bar" aria-label="Main navigation">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={activeTab === tab.id ? 'active' : ''}
+              title={tab.title}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              <span className="icon">{tab.icon}</span>
+              <span className="tab-label">{tab.label}</span>
+            </button>
+          ))}
+        </nav>
+      </div>
     </div>
   );
 }
