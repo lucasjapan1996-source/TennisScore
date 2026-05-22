@@ -2,12 +2,12 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { MatchRetirementActions } from './MatchRetirementActions';
 import { ScoreMatchupBar } from './ScoreMatchupBar';
 import { ScoreRefreshButton } from './ScoreRefreshButton';
+import { ScoreStepper } from './ScoreStepper';
 import { SetSeriesScoreForm } from './SetSeriesScoreForm';
 import { useStrings } from '../hooks/useStrings';
 import type { BestOf, SetScore } from '../types';
 import type { RetiredSide } from '../utils/matchOutcome';
 import { isRetired } from '../utils/matchOutcome';
-import { parseBigScorePair, parseSmallScore } from '../utils/score';
 
 export function ScoreForm({
   matchId,
@@ -72,6 +72,8 @@ export function ScoreForm({
               matchId={matchId}
               labelA={labelA}
               labelB={labelB}
+              textLabelA={textLabelA}
+              textLabelB={textLabelB}
               sets={sets}
               scoreA={scoreA}
               scoreB={scoreB}
@@ -85,8 +87,8 @@ export function ScoreForm({
           ) : (
             <Bo1ScoreForm
               matchId={matchId}
-              labelA={labelA}
-              labelB={labelB}
+              textLabelA={textLabelA}
+              textLabelB={textLabelB}
               scoreA={scoreA}
               scoreB={scoreB}
               tiebreakA={tiebreakA}
@@ -117,8 +119,8 @@ export function ScoreForm({
 
 function Bo1ScoreForm({
   matchId,
-  labelA,
-  labelB,
+  textLabelA,
+  textLabelB,
   scoreA,
   scoreB,
   tiebreakA,
@@ -130,8 +132,8 @@ function Bo1ScoreForm({
   clearTitle,
 }: {
   matchId: string;
-  labelA: ReactNode;
-  labelB: ReactNode;
+  textLabelA: string;
+  textLabelB: string;
   scoreA: number | null;
   scoreB: number | null;
   tiebreakA: number;
@@ -148,44 +150,62 @@ function Bo1ScoreForm({
   clearLabel: string;
   clearTitle: string;
 }) {
-  const [bigA, setBigA] = useState('');
-  const [smallA, setSmallA] = useState('');
-  const [bigB, setBigB] = useState('');
-  const [smallB, setSmallB] = useState('');
+  const S = useStrings();
+  const [gamesA, setGamesA] = useState(0);
+  const [gamesB, setGamesB] = useState(0);
+  const [tbA, setTbA] = useState(0);
+  const [tbB, setTbB] = useState(0);
 
   useEffect(() => {
-    setBigA(scoreA !== null ? String(scoreA) : '');
-    setBigB(scoreB !== null ? String(scoreB) : '');
-    setSmallA(String(tiebreakA));
-    setSmallB(String(tiebreakB));
+    setGamesA(scoreA ?? 0);
+    setGamesB(scoreB ?? 0);
+    setTbA(tiebreakA);
+    setTbB(tiebreakB);
   }, [matchId, scoreA, scoreB, tiebreakA, tiebreakB]);
 
-  const persist = (a: string, sa: string, b: string, sb: string) => {
+  const sideA = textLabelA || 'A';
+  const sideB = textLabelB || 'B';
+
+  const persist = (a: number, b: number, ta: number, tb: number) => {
     if (readOnly) return;
 
-    const parsed = parseBigScorePair(a, b);
-    if (parsed === 'clear') {
+    if (a === 0 && b === 0 && ta === 0 && tb === 0) {
       if (scoreA !== null || scoreB !== null) onClear(matchId);
       return;
     }
-    if (!parsed) return;
-
-    const { scoreA: na, scoreB: nb } = parsed;
-    if (na === nb) return;
-
-    const ta = parseSmallScore(sa);
-    const tb = parseSmallScore(sb);
+    if (a === b) return;
 
     if (
-      scoreA === na &&
-      scoreB === nb &&
+      scoreA === a &&
+      scoreB === b &&
       tiebreakA === ta &&
       tiebreakB === tb
     ) {
       return;
     }
 
-    onSave(matchId, na, nb, ta, tb);
+    onSave(matchId, a, b, ta, tb);
+  };
+
+  const bumpGamesA = () => {
+    const next = gamesA + 1;
+    setGamesA(next);
+    persist(next, gamesB, tbA, tbB);
+  };
+  const bumpGamesB = () => {
+    const next = gamesB + 1;
+    setGamesB(next);
+    persist(gamesA, next, tbA, tbB);
+  };
+  const bumpTbA = () => {
+    const next = tbA + 1;
+    setTbA(next);
+    persist(gamesA, gamesB, next, tbB);
+  };
+  const bumpTbB = () => {
+    const next = tbB + 1;
+    setTbB(next);
+    persist(gamesA, gamesB, tbA, next);
   };
 
   return (
@@ -193,72 +213,36 @@ function Bo1ScoreForm({
       className={`score-form-score-block score-form-compact${readOnly ? ' score-form-readonly' : ''}`}
     >
       <div className="score-inputs-row">
-        <input
-          type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          className="score-big score-cell-a-big"
-          value={bigA}
+        <ScoreStepper
+          value={gamesA}
+          onAdd={bumpGamesA}
           disabled={readOnly}
-          readOnly={readOnly}
-          onChange={(e) => {
-            const v = e.target.value;
-            setBigA(v);
-            persist(v, smallA, bigB, smallB);
-          }}
-          placeholder="0"
-          aria-label={`${labelA} big`}
+          size="big"
+          addLabel={S.scorePlusOneGames(sideA)}
         />
-        <input
-          type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          className="score-small score-cell-a-small"
-          value={smallA}
+        <ScoreStepper
+          value={tbA}
+          onAdd={bumpTbA}
           disabled={readOnly}
-          readOnly={readOnly}
-          onChange={(e) => {
-            const v = e.target.value;
-            setSmallA(v);
-            persist(bigA, v, bigB, smallB);
-          }}
-          placeholder="0"
-          aria-label={`${labelA} tiebreak`}
+          size="small"
+          addLabel={S.scorePlusOneTiebreak(sideA)}
         />
         <span className="score-colon score-cell-sep" aria-hidden>
           :
         </span>
-        <input
-          type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          className="score-big score-cell-b-big"
-          value={bigB}
+        <ScoreStepper
+          value={gamesB}
+          onAdd={bumpGamesB}
           disabled={readOnly}
-          readOnly={readOnly}
-          onChange={(e) => {
-            const v = e.target.value;
-            setBigB(v);
-            persist(bigA, smallA, v, smallB);
-          }}
-          placeholder="0"
-          aria-label={`${labelB} big`}
+          size="big"
+          addLabel={S.scorePlusOneGames(sideB)}
         />
-        <input
-          type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          className="score-small score-cell-b-small"
-          value={smallB}
+        <ScoreStepper
+          value={tbB}
+          onAdd={bumpTbB}
           disabled={readOnly}
-          readOnly={readOnly}
-          onChange={(e) => {
-            const v = e.target.value;
-            setSmallB(v);
-            persist(bigA, smallA, bigB, v);
-          }}
-          placeholder="0"
-          aria-label={`${labelB} tiebreak`}
+          size="small"
+          addLabel={S.scorePlusOneTiebreak(sideB)}
         />
       </div>
       {!readOnly && (

@@ -932,8 +932,8 @@ select.gender-select-unspecified {
 
 .set-series-form {
   --set-label-col: 2.5rem;
-  --set-score-big: 2.1rem;
-  --set-score-small: 1.55rem;
+  --set-score-big: 3rem;
+  --set-score-small: 2.55rem;
   --set-sep-col: 0.9rem;
 }
 
@@ -981,13 +981,8 @@ select.gender-select-unspecified {
   justify-self: center;
 }
 
-.set-row .score-big,
-.set-row .score-small {
-  width: 100%;
-  min-width: 0;
-  padding: 0.38rem 0.15rem;
-  text-align: center;
-  font-weight: 700;
+.set-row .score-stepper {
+  justify-self: center;
 }
 
 .match-card-compact .set-series-form {
@@ -1059,11 +1054,8 @@ select.gender-select-unspecified {
   letter-spacing: 0.04em;
 }
 
-.score-form-readonly .score-big,
-.score-form-readonly .score-small {
+.score-form-readonly .score-stepper {
   opacity: 0.72;
-  cursor: not-allowed;
-  background: var(--surface);
 }
 
 .match-retirement {
@@ -1232,8 +1224,8 @@ select.gender-select-unspecified {
 }
 
 .score-form-compact {
-  --sf-big: 2.35rem;
-  --sf-small: 1.7rem;
+  --sf-big: 3rem;
+  --sf-small: 2.55rem;
   --sf-sep: 1.1rem;
 }
 
@@ -1270,8 +1262,8 @@ select.gender-select-unspecified {
     var(--sf-big)
     var(--sf-small)
     var(--sf-sep)
-    var(--sf-small)
-    var(--sf-big);
+    var(--sf-big)
+    var(--sf-small);
   align-items: center;
   justify-content: center;
   column-gap: 0.3rem;
@@ -1287,18 +1279,60 @@ select.gender-select-unspecified {
   color: var(--muted);
 }
 
-.score-form-compact .score-big,
-.score-form-compact .score-small {
+.score-stepper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   width: 100%;
-  min-width: 0;
-  padding: 0.4rem 0.15rem;
-  font-size: 0.95rem;
-  text-align: center;
-  font-weight: 700;
+  aspect-ratio: 1;
+  min-width: 2.65rem;
+  min-height: 2.65rem;
+  padding: 0.2rem;
+  margin: 0;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  cursor: pointer;
+  touch-action: manipulation;
+  font: inherit;
+  color: inherit;
 }
 
-.score-form-compact .score-small {
-  font-size: 0.8rem;
+button.score-stepper:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+button.score-stepper:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.score-stepper--readonly {
+  cursor: default;
+  background: var(--surface);
+}
+
+.score-stepper-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  color: var(--text);
+}
+
+.score-stepper--big .score-stepper-value {
+  font-size: 1.45rem;
+}
+
+.score-stepper--small .score-stepper-value {
+  font-size: 1rem;
+  color: var(--muted);
+}
+
+.score-form-compact .score-stepper {
+  width: 100%;
 }
 
 .score-clear-centered {
@@ -2309,8 +2343,12 @@ p.row + p,
     font-size: 16px;
   }
 
-  .score-form-compact .score-big,
-  .score-form-compact .score-small {
+  .score-stepper {
+    min-width: 2.85rem;
+    min-height: 2.85rem;
+  }
+
+  .score-stepper-value {
     font-size: 16px;
   }
 
@@ -2331,11 +2369,11 @@ p.row + p,
 
   .score-inputs-row,
   .set-row {
-    --sf-big: 2.1rem;
-    --sf-small: 1.55rem;
+    --sf-big: 2.85rem;
+    --sf-small: 2.55rem;
     --sf-sep: 0.85rem;
-    --set-score-big: 2.1rem;
-    --set-score-small: 1.55rem;
+    --set-score-big: 2.85rem;
+    --set-score-small: 2.55rem;
     --set-sep-col: 0.85rem;
     --set-label-col: 3rem;
     column-gap: 0.2rem;
@@ -2589,9 +2627,7 @@ html.is-standalone .tab-bar button .tab-label {
   .player-form-col .player-form-gender-select,
   .player-bulk-count-input,
   .tournament-description-input,
-  .score-form-compact .score-big,
-  .score-form-compact .score-small,
-  .score-inputs input {
+  .score-stepper-value {
     font-size: max(16px, 1em);
   }
 }

@@ -266,6 +266,9 @@ export const jaStrings: Strings = {
   scoreHintTitle: '大ポイント・小ポイントの入力ルール',
   clearScore: 'リセット',
   clearScoreTitle: 'スコアをリセットして未実施に戻す',
+  scorePlusOne: '+1',
+  scorePlusOneGames: (side) => `${side} ゲーム +1`,
+  scorePlusOneTiebreak: (side) => `${side} タイブレーク +1`,
   matchResultsTitle: '試合スコア',
   matchResultsTitleHint: '記録済みの対戦スコア一覧',
 

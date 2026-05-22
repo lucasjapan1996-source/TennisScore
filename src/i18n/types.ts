@@ -237,6 +237,9 @@ export interface Strings {
   scoreHintTitle: string;
   clearScore: string;
   clearScoreTitle: string;
+  scorePlusOne: string;
+  scorePlusOneGames: (side: string) => string;
+  scorePlusOneTiebreak: (side: string) => string;
   matchResultsTitle: string;
   matchResultsTitleHint: string;
   noRankTitle: string;
