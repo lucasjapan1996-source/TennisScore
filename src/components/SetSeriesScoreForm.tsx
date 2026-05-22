@@ -13,7 +13,7 @@ type DraftSet = {
 };
 
 function emptyDraft(): DraftSet {
-  return { gamesA: '0', gamesB: '0', tiebreakA: '', tiebreakB: '' };
+  return { gamesA: '', gamesB: '', tiebreakA: '', tiebreakB: '' };
 }
 
 function draftFromSet(s: SetScore): DraftSet {

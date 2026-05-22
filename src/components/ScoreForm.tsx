@@ -148,14 +148,14 @@ function Bo1ScoreForm({
   clearLabel: string;
   clearTitle: string;
 }) {
-  const [bigA, setBigA] = useState('0');
+  const [bigA, setBigA] = useState('');
   const [smallA, setSmallA] = useState('');
-  const [bigB, setBigB] = useState('0');
+  const [bigB, setBigB] = useState('');
   const [smallB, setSmallB] = useState('');
 
   useEffect(() => {
-    setBigA(scoreA !== null ? String(scoreA) : '0');
-    setBigB(scoreB !== null ? String(scoreB) : '0');
+    setBigA(scoreA !== null ? String(scoreA) : '');
+    setBigB(scoreB !== null ? String(scoreB) : '');
     setSmallA(String(tiebreakA));
     setSmallB(String(tiebreakB));
   }, [matchId, scoreA, scoreB, tiebreakA, tiebreakB]);
