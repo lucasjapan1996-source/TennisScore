@@ -21,6 +21,13 @@ import {
   countDoublesPartnerRoundMatches,
 } from './doublesRoundRobin';
 import { isMatchPlayed } from './score';
+import {
+  buildCircleRoundRobinRounds,
+  buildMatchOrderWithSequentialFirst,
+  buildTeamMatchOrderWithSequentialFirst,
+  interleaveRoundRobinRounds,
+  orderByRestAndFairness,
+} from './matchOrder';
 
 function uid(): string {
   return crypto.randomUUID();
@@ -37,45 +44,6 @@ export function shuffle<T>(arr: T[]): T[] {
 
 export function orderEntities<T>(entities: T[], seedMode: ScheduleSeedMode): T[] {
   return seedMode === 'random' ? shuffle(entities) : [...entities];
-}
-
-function allPairings<T>(entities: T[]): [T, T][] {
-  const pairs: [T, T][] = [];
-  for (let i = 0; i < entities.length; i++) {
-    for (let j = i + 1; j < entities.length; j++) {
-      pairs.push([entities[i], entities[j]]);
-    }
-  }
-  return pairs;
-}
-
-/** 排程：尽量避免同一选手/队伍连续上场 */
-export function orderPairingsNoBackToBack<T>(
-  pairings: [T, T][],
-  idOf: (e: T) => string,
-): [T, T][] {
-  const remaining = [...pairings];
-  const ordered: [T, T][] = [];
-  let last = new Set<string>();
-
-  while (remaining.length > 0) {
-    let pick = 0;
-    let bestConflict = Infinity;
-    for (let i = 0; i < remaining.length; i++) {
-      const ids = new Set([idOf(remaining[i][0]), idOf(remaining[i][1])]);
-      const conflict = [...ids].filter((id) => last.has(id)).length;
-      if (conflict < bestConflict) {
-        bestConflict = conflict;
-        pick = i;
-        if (conflict === 0) break;
-      }
-    }
-    const [a, b] = remaining.splice(pick, 1)[0];
-    ordered.push([a, b]);
-    last = new Set([idOf(a), idOf(b)]);
-  }
-
-  return ordered;
 }
 
 function emptyGroupMatch(
@@ -216,8 +184,11 @@ export function buildRoundRobinSchedule(
 ): ScheduleResult {
   if (mode === 'singles') {
     const ordered = orderEntities(players, seedMode);
-    const pairings = allPairings(ordered);
-    const matchOrder = orderPairingsNoBackToBack(pairings, (p) => p.id);
+    const matchOrder = buildMatchOrderWithSequentialFirst(
+      ordered,
+      (p) => p.id,
+      seedMode,
+    );
     const { matches } = buildMatchesFromPairings(
       matchOrder,
       null,
@@ -233,13 +204,18 @@ export function buildRoundRobinSchedule(
       orderedIds,
       (order, sideAIds, sideBIds) =>
         emptyRoundRobinMatch(order, sideAIds, sideBIds),
+      1,
+      seedMode,
     );
     return { matches, groups: [] };
   }
 
   const orderedTeams = orderEntities(teams, seedMode);
-  const pairings = allPairings(orderedTeams);
-  const matchOrder = orderPairingsNoBackToBack(pairings, (t) => t.id);
+  const matchOrder = buildTeamMatchOrderWithSequentialFirst(
+    orderedTeams,
+    (t) => t.id,
+    seedMode,
+  );
   const { matches } = buildMatchesFromPairings(
     matchOrder,
     null,
@@ -260,22 +236,47 @@ export function buildGroupStageSchedule(
     const groups = assignGroups(players, groupCount, (p) => p.id, seedMode);
     const matches: Match[] = [];
     let order = 1;
-    for (const g of groups) {
-      const members = g.memberIds
-        .map((id) => players.find((p) => p.id === id))
-        .filter((p): p is Player => !!p);
-      if (members.length < 2) continue;
-      const pairings = allPairings(orderEntities(members, seedMode));
-      const matchOrder = orderPairingsNoBackToBack(pairings, (p) => p.id);
-      const built = buildMatchesFromPairings(
-        matchOrder,
-        g.id,
-        order,
-        (p) => [p.id],
+
+    if (seedMode === 'sequential') {
+      for (const g of groups) {
+        const members = g.memberIds
+          .map((id) => players.find((p) => p.id === id))
+          .filter((p): p is Player => !!p);
+        if (members.length < 2) continue;
+        const ordered = orderEntities(members, seedMode);
+        const matchOrder = buildMatchOrderWithSequentialFirst(
+          ordered,
+          (p) => p.id,
+          seedMode,
+        );
+        for (const [a, b] of matchOrder) {
+          matches.push(emptyGroupMatch(g.id, order++, [a.id], [b.id]));
+        }
+      }
+    } else {
+      const roundsPerGroup: [Player, Player][][][] = [];
+      for (const g of groups) {
+        const members = g.memberIds
+          .map((id) => players.find((p) => p.id === id))
+          .filter((p): p is Player => !!p);
+        if (members.length < 2) continue;
+        roundsPerGroup.push(
+          buildCircleRoundRobinRounds(orderEntities(members, seedMode)),
+        );
+      }
+      const matchOrder = orderByRestAndFairness(
+        interleaveRoundRobinRounds(roundsPerGroup),
+        ([a, b]) => [a.id, b.id],
       );
-      matches.push(...built.matches);
-      order = built.nextOrder;
+      for (const [a, b] of matchOrder) {
+        const groupId =
+          groups.find(
+            (g) => g.memberIds.includes(a.id) && g.memberIds.includes(b.id),
+          )?.id ?? 1;
+        matches.push(emptyGroupMatch(groupId, order++, [a.id], [b.id]));
+      }
     }
+
     const knockout = buildKnockoutMatches(groups, order, seedMode);
     matches.push(...knockout.matches);
     return { matches, groups };
@@ -284,22 +285,52 @@ export function buildGroupStageSchedule(
   const groups = assignGroups(teams, groupCount, (t) => t.id, seedMode);
   const matches: Match[] = [];
   let order = 1;
-  for (const g of groups) {
-    const members = g.memberIds
-      .map((id) => teams.find((t) => t.id === id))
-      .filter((t): t is Team => !!t);
-    if (members.length < 2) continue;
-    const pairings = allPairings(orderEntities(members, seedMode));
-    const matchOrder = orderPairingsNoBackToBack(pairings, (t) => t.id);
-    const built = buildMatchesFromPairings(
-      matchOrder,
-      g.id,
-      order,
-      (t) => [...t.playerIds],
+
+  if (seedMode === 'sequential') {
+    for (const g of groups) {
+      const members = g.memberIds
+        .map((id) => teams.find((t) => t.id === id))
+        .filter((t): t is Team => !!t);
+      if (members.length < 2) continue;
+      const ordered = orderEntities(members, seedMode);
+      const matchOrder = buildTeamMatchOrderWithSequentialFirst(
+        ordered,
+        (t) => t.id,
+        seedMode,
+      );
+      for (const [ta, tb] of matchOrder) {
+        matches.push(
+          emptyGroupMatch(g.id, order++, [...ta.playerIds], [...tb.playerIds]),
+        );
+      }
+    }
+  } else {
+    const roundsPerGroup: [Team, Team][][][] = [];
+    for (const g of groups) {
+      const members = g.memberIds
+        .map((id) => teams.find((t) => t.id === id))
+        .filter((t): t is Team => !!t);
+      if (members.length < 2) continue;
+      roundsPerGroup.push(
+        buildCircleRoundRobinRounds(orderEntities(members, seedMode)),
+      );
+    }
+    const matchOrder = orderByRestAndFairness(
+      interleaveRoundRobinRounds(roundsPerGroup),
+      ([ta, tb]) => [ta.id, tb.id],
     );
-    matches.push(...built.matches);
-    order = built.nextOrder;
+    for (const [ta, tb] of matchOrder) {
+      const groupId =
+        groups.find(
+          (g) =>
+            g.memberIds.includes(ta.id) && g.memberIds.includes(tb.id),
+        )?.id ?? 1;
+      matches.push(
+        emptyGroupMatch(groupId, order++, [...ta.playerIds], [...tb.playerIds]),
+      );
+    }
   }
+
   const knockout = buildKnockoutMatches(groups, order, seedMode);
   matches.push(...knockout.matches);
   return { matches, groups };

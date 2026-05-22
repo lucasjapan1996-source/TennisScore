@@ -1,4 +1,5 @@
-import type { Match } from '../types';
+import type { Match, ScheduleSeedMode } from '../types';
+import { orderByRestAndFairness } from './matchOrder';
 
 export type DoublesSide = readonly [string, string];
 
@@ -41,7 +42,7 @@ export function allDoublesMatchups(partnerships: DoublesSide[]): DoublesMatchup[
   return matches;
 }
 
-function matchupKey(m: DoublesMatchup): string {
+export function matchupKey(m: DoublesMatchup): string {
   const kA = partnershipKey(m.sideA[0], m.sideA[1]);
   const kB = partnershipKey(m.sideB[0], m.sideB[1]);
   return kA < kB ? `${kA}|${kB}` : `${kB}|${kA}`;
@@ -100,36 +101,47 @@ export function selectPartnerRoundMatches(playerIds: string[]): DoublesMatchup[]
   return selected;
 }
 
-/** 尽量避免同一球员连续上场 */
+/** 尽量避免连场，并均衡各人等待时间 */
 export function orderDoublesMatchesNoBackToBack(
   matches: DoublesMatchup[],
 ): DoublesMatchup[] {
-  const remaining = [...matches];
-  const ordered: DoublesMatchup[] = [];
-  let last = new Set<string>();
-
-  while (remaining.length > 0) {
-    let pick = 0;
-    let bestConflict = Infinity;
-    for (let i = 0; i < remaining.length; i++) {
-      const ids = new Set([
-        ...remaining[i].sideA,
-        ...remaining[i].sideB,
-      ]);
-      const conflict = [...ids].filter((id) => last.has(id)).length;
-      if (conflict < bestConflict) {
-        bestConflict = conflict;
-        pick = i;
-        if (conflict === 0) break;
-      }
-    }
-    const m = remaining.splice(pick, 1)[0];
-    ordered.push(m);
-    last = new Set([...m.sideA, ...m.sideB]);
-  }
-
-  return ordered;
+  return orderByRestAndFairness(matches, (m) => [...m.sideA, ...m.sideB]);
 }
+
+/** 按签位顺序：每 4 人一场 12&2 vs 3&4，下一波 5&6 vs 7&8 */
+export function buildSequentialDoublesBlockMatchups(
+  playerIds: readonly string[],
+): DoublesMatchup[] {
+  const blocks: DoublesMatchup[] = [];
+  for (let i = 0; i + 3 < playerIds.length; i += 4) {
+    blocks.push({
+      sideA: [playerIds[i], playerIds[i + 1]],
+      sideB: [playerIds[i + 2], playerIds[i + 3]],
+    });
+  }
+  return blocks;
+}
+
+/** 按顺序：先排齐相邻四人间对阵，再排其余搭档赛 */
+export function orderDoublesMatchesSequentialFirst(
+  pool: readonly DoublesMatchup[],
+  playerIds: readonly string[],
+): DoublesMatchup[] {
+  const blocks = buildSequentialDoublesBlockMatchups(playerIds);
+  const byKey = new Map(pool.map((m) => [matchupKey(m), m]));
+  const first: DoublesMatchup[] = [];
+  const used = new Set<string>();
+  for (const b of blocks) {
+    const hit = byKey.get(matchupKey(b));
+    if (hit) {
+      first.push(hit);
+      used.add(matchupKey(hit));
+    }
+  }
+  const rest = pool.filter((m) => !used.has(matchupKey(m)));
+  return [...first, ...orderByRestAndFairness(rest, (m) => [...m.sideA, ...m.sideB])];
+}
+
 
 export function countDoublesPartnerRoundMatches(playerCount: number): number {
   if (playerCount < 4) return 0;
@@ -145,9 +157,13 @@ export function buildDoublesPartnerRoundRobinMatches(
     sideBIds: string[],
   ) => Match,
   startOrder = 1,
+  seedMode: ScheduleSeedMode = 'random',
 ): Match[] {
   const selected = selectPartnerRoundMatches(playerIds);
-  const matchOrder = orderDoublesMatchesNoBackToBack(selected);
+  const matchOrder =
+    seedMode === 'sequential'
+      ? orderDoublesMatchesSequentialFirst(selected, playerIds)
+      : orderDoublesMatchesNoBackToBack(selected);
   return matchOrder.map((m, idx) =>
     createMatch(startOrder + idx, [...m.sideA], [...m.sideB]),
   );
