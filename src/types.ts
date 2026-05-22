@@ -92,6 +92,8 @@ export interface Match {
   playedAt: string | null;
   /** 轮空直接晋级，无需录入比分 */
   isBye: boolean;
+  /** 对战表手动标记为完赛（与比分录入无关） */
+  scheduleMarkedDone: boolean;
 }
 
 export interface Tournament {

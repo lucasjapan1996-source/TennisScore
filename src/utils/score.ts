@@ -31,6 +31,20 @@ export function parseSmallScore(raw: string): number {
   return Number.isNaN(n) || n < 0 ? 0 : n;
 }
 
+/** 大分录入：双边皆空清除；单边留空视为 0 */
+export function parseBigScorePair(
+  rawA: string,
+  rawB: string,
+): { scoreA: number; scoreB: number } | 'clear' | null {
+  const trimmedA = rawA.trim();
+  const trimmedB = rawB.trim();
+  if (trimmedA === '' && trimmedB === '') return 'clear';
+  const na = trimmedA === '' ? 0 : parseInt(trimmedA, 10);
+  const nb = trimmedB === '' ? 0 : parseInt(trimmedB, 10);
+  if (Number.isNaN(na) || Number.isNaN(nb) || na < 0 || nb < 0) return null;
+  return { scoreA: na, scoreB: nb };
+}
+
 export function formatSideScore(big: number, tiebreak: number): string {
   if (tiebreak > 0) return `${big}(${tiebreak})`;
   return String(big);

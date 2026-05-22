@@ -26,7 +26,9 @@ import {
   DEFAULT_TOURNAMENT_CATEGORY,
   type DoublesPairing,
 } from '../types';
+import { applyScheduleMarkAfterScoreUpdate } from '../utils/schedule';
 import { normalizeBestOf, resolveMatchBestOf } from '../utils/bestOf';
+import { isMatchPlayed } from '../utils/score';
 import { normalizePlayers } from '../utils/player';
 import { getActiveStrings } from '../i18n';
 import { formatSideCompactLabel } from '../utils/player';
@@ -140,6 +142,7 @@ interface TournamentState {
   updateMatchSets: (matchId: string, sets: SetScore[]) => void;
   setMatchRetirement: (matchId: string, retiredSide: RetiredSide | null) => void;
   clearMatchScore: (matchId: string) => void;
+  setMatchScheduleMarkedDone: (matchId: string, marked: boolean) => void;
   resetTournament: () => void;
 }
 
@@ -560,7 +563,7 @@ export const useTournamentStore = create<TournamentState>()(
               matches: t.matches.map((m) => {
                 if (m.id !== matchId) return m;
                 const resolved = resolveMatchSides(m, t, compactLabelForTournament(t));
-                return {
+                return applyScheduleMarkAfterScoreUpdate({
                   ...m,
                   sideAIds:
                     m.phase === 'knockout' && resolved.ready
@@ -577,7 +580,7 @@ export const useTournamentStore = create<TournamentState>()(
                   sets: [],
                   retiredSide: null,
                   playedAt: new Date().toISOString(),
-                };
+                });
               }),
             },
           };
@@ -597,7 +600,7 @@ export const useTournamentStore = create<TournamentState>()(
               matches: t.matches.map((m) => {
                 if (m.id !== matchId) return m;
                 const resolved = resolveMatchSides(m, t, compactLabelForTournament(t));
-                return {
+                return applyScheduleMarkAfterScoreUpdate({
                   ...m,
                   sideAIds:
                     m.phase === 'knockout' && resolved.ready
@@ -608,7 +611,7 @@ export const useTournamentStore = create<TournamentState>()(
                       ? resolved.sideBIds
                       : m.sideBIds,
                   ...applied,
-                };
+                });
               }),
             },
           };
@@ -637,15 +640,20 @@ export const useTournamentStore = create<TournamentState>()(
                       : m.sideBIds,
                 };
                 if (!retiredSide) {
-                  return { ...base, retiredSide: null };
+                  return applyScheduleMarkAfterScoreUpdate({
+                    ...base,
+                    retiredSide: null,
+                  });
                 }
                 const matchBestOf = resolveMatchBestOf(base, t);
-                return sanitizeRetiredMatch(
-                  {
-                    ...base,
-                    ...applyRetirementScores(retiredSide, base, matchBestOf),
-                  },
-                  matchBestOf,
+                return applyScheduleMarkAfterScoreUpdate(
+                  sanitizeRetiredMatch(
+                    {
+                      ...base,
+                      ...applyRetirementScores(retiredSide, base, matchBestOf),
+                    },
+                    matchBestOf,
+                  ),
                 );
               }),
             },
@@ -670,8 +678,23 @@ export const useTournamentStore = create<TournamentState>()(
                       sets: [],
                       retiredSide: null,
                       playedAt: null,
+                      scheduleMarkedDone: false,
                     }
                   : m,
+              ),
+            },
+          };
+        }),
+
+      setMatchScheduleMarkedDone: (matchId, marked) =>
+        set((s) => {
+          const target = s.tournament.matches.find((m) => m.id === matchId);
+          if (!target || target.isBye) return s;
+          return {
+            tournament: {
+              ...s.tournament,
+              matches: s.tournament.matches.map((m) =>
+                m.id === matchId ? { ...m, scheduleMarkedDone: marked } : m,
               ),
             },
           };
@@ -816,7 +839,19 @@ export const useTournamentStore = create<TournamentState>()(
                 isBye: legacy.isBye === true,
               };
               const bo = resolveMatchBestOf(row, bestOfCtx);
-              return sanitizeRetiredMatch(row, bo);
+              const normalized = sanitizeRetiredMatch(row, bo);
+              const legacyMark = (
+                legacy as Match & { scheduleMarkedDone?: boolean }
+              ).scheduleMarkedDone;
+              return {
+                ...normalized,
+                scheduleMarkedDone:
+                  legacyMark === true
+                    ? true
+                    : legacyMark === false
+                      ? false
+                      : isMatchPlayed(normalized),
+              };
               });
             })(),
             scheduleBatchSizes: (() => {

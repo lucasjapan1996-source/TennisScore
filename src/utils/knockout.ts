@@ -352,6 +352,7 @@ function createKnockoutAdd(matches: Match[], startOrder: number) {
       retiredSide: null,
       playedAt: isBye ? new Date().toISOString() : null,
       isBye,
+      scheduleMarkedDone: false,
     };
     matches.push(m);
     return m;

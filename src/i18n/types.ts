@@ -184,6 +184,11 @@ export interface Strings {
   matrixPendingOrder: (order: number) => string;
   matchNoTitle: (n: number) => string;
   matchPendingShort: string;
+  matchStatusPending: string;
+  matchStatusDone: string;
+  matchStatusSwitchPendingTitle: string;
+  matchStatusSwitchDoneTitle: string;
+  matchStatusSwitchDisabled: string;
   goScore: string;
   goScoreTitle: string;
   appendSchedule: string;

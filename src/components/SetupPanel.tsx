@@ -59,6 +59,7 @@ export function SetupPanel() {
     setTeamPair,
     generateSchedule,
     appendSchedule,
+    setMatchScheduleMarkedDone,
     setActiveTab,
   } = useTournamentStore();
   const genderVisible = showPlayerGender(tournament.category);
@@ -71,6 +72,10 @@ export function SetupPanel() {
   const handleAppendSchedule = () => {
     const err = appendSchedule();
     setError(err);
+  };
+
+  const handleToggleMatchStatus = (matchId: string, marked: boolean) => {
+    setMatchScheduleMarkedDone(matchId, marked);
   };
 
   const isDoubles = tournament.mode === 'doubles';
@@ -468,6 +473,7 @@ export function SetupPanel() {
           matches={tournament.matches}
           scheduleBatchSizes={tournament.scheduleBatchSizes}
           onAppendSchedule={handleAppendSchedule}
+          onToggleMatchStatus={handleToggleMatchStatus}
           onGoScore={() => setActiveTab('matches')}
         />
       )}

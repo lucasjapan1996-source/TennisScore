@@ -13,7 +13,7 @@ type DraftSet = {
 };
 
 function emptyDraft(): DraftSet {
-  return { gamesA: '', gamesB: '', tiebreakA: '', tiebreakB: '' };
+  return { gamesA: '0', gamesB: '0', tiebreakA: '', tiebreakB: '' };
 }
 
 function draftFromSet(s: SetScore): DraftSet {
@@ -36,9 +36,9 @@ function parseCompleteDrafts(drafts: DraftSet[]): SetScore[] {
   for (const d of drafts) {
     const ga = d.gamesA.trim();
     const gb = d.gamesB.trim();
-    if (ga === '' || gb === '') continue;
-    const gamesA = parseInt(ga, 10);
-    const gamesB = parseInt(gb, 10);
+    if (ga === '' && gb === '') continue;
+    const gamesA = ga === '' ? 0 : parseInt(ga, 10);
+    const gamesB = gb === '' ? 0 : parseInt(gb, 10);
     if (Number.isNaN(gamesA) || Number.isNaN(gamesB)) continue;
     const s: SetScore = {
       gamesA,

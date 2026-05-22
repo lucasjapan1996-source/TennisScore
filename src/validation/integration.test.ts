@@ -265,6 +265,7 @@ describe('best of / round robin', () => {
       slotA: null,
       slotB: null,
       isBye: false,
+      scheduleMarkedDone: false,
     };
     expect(resolveMatchBestOf(m, t)).toBe(1);
     expect(tournamentHasFinal('round_robin')).toBe(false);
@@ -296,6 +297,7 @@ describe('best of / round robin', () => {
       slotA: null,
       slotB: null,
       isBye: false,
+      scheduleMarkedDone: false,
     };
     const final: Match = { ...semi, id: 'f', knockoutStage: 'final' };
     expect(resolveMatchBestOf(semi, t)).toBe(3);

@@ -13,6 +13,15 @@
     <title>网球比赛计分</title>
     <link rel="icon" type="image/png" href="/djokovic-logo.png" />
     <link rel="apple-touch-icon" href="/icon-512.png" />
+    <script>
+      (function () {
+        var s =
+          window.navigator.standalone === true ||
+          window.matchMedia('(display-mode: standalone)').matches ||
+          window.matchMedia('(display-mode: fullscreen)').matches;
+        if (s) document.documentElement.classList.add('is-standalone');
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

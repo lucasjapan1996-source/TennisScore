@@ -15,19 +15,17 @@ import type {
 import type { ResolveSidesTournament } from '../utils/knockout';
 import {
   groupMatchesBySection,
+  isMatchScheduleMarkedDone,
   matchPairKey,
   splitMatchesByBatches,
 } from '../utils/schedule';
 import { formatScheduleMatchLine, formatSideCompactLabel } from '../utils/player';
 import { showPlayerGender } from '../utils/tournamentCategory';
 import { knockoutMatchLabel, resolveMatchSides } from '../utils/knockout';
-import {
-  formatMatchScore,
-  formatMatchScoreForRow,
-  isMatchPlayed,
-} from '../utils/score';
+import { formatMatchScoreForRow } from '../utils/score';
 import { getActiveStrings } from '../i18n';
 import { useStrings } from '../hooks/useStrings';
+import { ScheduleMatchStatusSwitch } from './ScheduleMatchStatusSwitch';
 
 interface ScheduleOverviewProps {
   mode: MatchMode;
@@ -45,6 +43,7 @@ interface ScheduleOverviewProps {
   scheduleBatchSizes?: number[];
   onAppendSchedule?: () => void;
   onGoScore?: () => void;
+  onToggleMatchStatus?: (matchId: string, played: boolean) => void;
 }
 
 interface MatrixEntity {
@@ -95,6 +94,7 @@ export function ScheduleOverview({
   scheduleBatchSizes = [],
   onAppendSchedule,
   onGoScore,
+  onToggleMatchStatus,
 }: ScheduleOverviewProps) {
   const resolveCtx: ResolveSidesTournament = {
     matches,
@@ -150,7 +150,9 @@ export function ScheduleOverview({
     return splitMatchesByBatches(rrMatches, scheduleBatchSizes);
   }, [showMatrix, matches, scheduleBatchSizes]);
 
-  const doneCount = matches.filter((m) => isMatchPlayed(m)).length;
+  const doneCount = matches.filter(
+    (m) => !m.isBye && isMatchScheduleMarkedDone(m),
+  ).length;
 
   return (
     <CollapsiblePanel
@@ -234,14 +236,19 @@ export function ScheduleOverview({
                       mode,
                     )
                   : `${resolved.labelA} vs ${resolved.labelB}`;
-                const score = m.isBye ? S.knockoutByeShort : formatMatchScore(m);
-                const done = m.isBye || score !== '';
+                const markedDone = isMatchScheduleMarkedDone(m);
+                const canToggle =
+                  !m.isBye &&
+                  !!onToggleMatchStatus &&
+                  resolved.ready &&
+                  m.sideAIds.length > 0 &&
+                  m.sideBIds.length > 0;
                 const stageLabel =
                   m.knockoutStage != null ? knockoutMatchLabel(m) : null;
                 return (
                   <li
                     key={m.id}
-                    className={`schedule-match-row${done ? ' done' : ''}`}
+                    className={`schedule-match-row${markedDone ? ' done' : ''}`}
                   >
                     <span className="schedule-match-no" title={S.matchNoTitle(m.order)}>
                       {stageLabel ?? m.order}
@@ -249,11 +256,16 @@ export function ScheduleOverview({
                     <span className="schedule-match-line" title={matchupLine}>
                       {matchupLine}
                     </span>
-                    <span
-                      className={`schedule-match-status${done ? ' scored' : ''}`}
-                    >
-                      {done ? score : S.matchPendingShort}
-                    </span>
+                    {m.isBye ? (
+                      <span className="schedule-match-bye">{S.knockoutByeShort}</span>
+                    ) : (
+                      <ScheduleMatchStatusSwitch
+                        played={markedDone}
+                        disabled={!canToggle}
+                        disabledHint={resolved.waitingReason ?? undefined}
+                        onChange={(next) => onToggleMatchStatus?.(m.id, next)}
+                      />
+                    )}
                   </li>
                 );
               })}

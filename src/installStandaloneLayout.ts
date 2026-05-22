@@ -7,9 +7,14 @@ export function installStandaloneLayoutClass(): void {
       (window.navigator as Navigator & { standalone?: boolean }).standalone ===
         true;
     document.documentElement.classList.toggle('is-standalone', standalone);
+    const root = document.documentElement.style;
+    root.setProperty('--safe-top-inset', 'env(safe-area-inset-top, 0px)');
+    root.setProperty('--safe-bottom-inset', 'env(safe-area-inset-bottom, 0px)');
   };
 
   apply();
+  window.addEventListener('pageshow', apply);
+  window.visualViewport?.addEventListener('resize', apply);
   window.matchMedia('(display-mode: standalone)').addEventListener('change', apply);
   window.matchMedia('(display-mode: fullscreen)').addEventListener('change', apply);
 }

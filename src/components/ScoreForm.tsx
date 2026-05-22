@@ -7,7 +7,7 @@ import { useStrings } from '../hooks/useStrings';
 import type { BestOf, SetScore } from '../types';
 import type { RetiredSide } from '../utils/matchOutcome';
 import { isRetired } from '../utils/matchOutcome';
-import { parseSmallScore } from '../utils/score';
+import { parseBigScorePair, parseSmallScore } from '../utils/score';
 
 export function ScoreForm({
   matchId,
@@ -65,7 +65,7 @@ export function ScoreForm({
           {disabledHint ?? S.knockoutLocked}
         </p>
       ) : (
-        <div className="score-form-main-row">
+        <div className="score-form-stack">
           <ScoreMatchupBar labelA={labelA} labelB={labelB} />
           {bestOf > 1 && onSaveSets ? (
             <SetSeriesScoreForm
@@ -148,14 +148,14 @@ function Bo1ScoreForm({
   clearLabel: string;
   clearTitle: string;
 }) {
-  const [bigA, setBigA] = useState('');
+  const [bigA, setBigA] = useState('0');
   const [smallA, setSmallA] = useState('');
-  const [bigB, setBigB] = useState('');
+  const [bigB, setBigB] = useState('0');
   const [smallB, setSmallB] = useState('');
 
   useEffect(() => {
-    setBigA(scoreA !== null ? String(scoreA) : '');
-    setBigB(scoreB !== null ? String(scoreB) : '');
+    setBigA(scoreA !== null ? String(scoreA) : '0');
+    setBigB(scoreB !== null ? String(scoreB) : '0');
     setSmallA(String(tiebreakA));
     setSmallB(String(tiebreakB));
   }, [matchId, scoreA, scoreB, tiebreakA, tiebreakB]);
@@ -163,19 +163,15 @@ function Bo1ScoreForm({
   const persist = (a: string, sa: string, b: string, sb: string) => {
     if (readOnly) return;
 
-    const trimmedA = a.trim();
-    const trimmedB = b.trim();
-
-    if (trimmedA === '' && trimmedB === '') {
+    const parsed = parseBigScorePair(a, b);
+    if (parsed === 'clear') {
       if (scoreA !== null || scoreB !== null) onClear(matchId);
       return;
     }
+    if (!parsed) return;
 
-    if (trimmedA === '' || trimmedB === '') return;
-
-    const na = parseInt(trimmedA, 10);
-    const nb = parseInt(trimmedB, 10);
-    if (Number.isNaN(na) || Number.isNaN(nb) || na < 0 || nb < 0 || na === nb) return;
+    const { scoreA: na, scoreB: nb } = parsed;
+    if (na === nb) return;
 
     const ta = parseSmallScore(sa);
     const tb = parseSmallScore(sb);

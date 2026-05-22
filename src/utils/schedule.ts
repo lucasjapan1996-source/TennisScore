@@ -20,6 +20,7 @@ import {
   buildDoublesPartnerRoundRobinMatches,
   countDoublesPartnerRoundMatches,
 } from './doublesRoundRobin';
+import { isMatchPlayed } from './score';
 
 function uid(): string {
   return crypto.randomUUID();
@@ -102,6 +103,7 @@ function emptyGroupMatch(
     retiredSide: null,
     playedAt: null,
     isBye: false,
+    scheduleMarkedDone: false,
   };
 }
 
@@ -129,7 +131,21 @@ function emptyRoundRobinMatch(
     retiredSide: null,
     playedAt: null,
     isBye: false,
+    scheduleMarkedDone: false,
   };
+}
+
+/** 对战表上的完赛标记（不影响比分与排名逻辑） */
+export function isMatchScheduleMarkedDone(m: Match): boolean {
+  return m.scheduleMarkedDone === true;
+}
+
+/** 录入有效比分后自动标记为完赛（可再手动改 Switch） */
+export function applyScheduleMarkAfterScoreUpdate(m: Match): Match {
+  if (isMatchPlayed(m)) {
+    return { ...m, scheduleMarkedDone: true };
+  }
+  return m;
 }
 
 export function assignGroups<T>(

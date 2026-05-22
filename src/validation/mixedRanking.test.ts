@@ -32,6 +32,7 @@ function match(a: string, b: string, scoreA: number, scoreB: number): Match {
     retiredSide: null,
     playedAt: null,
     isBye: false,
+    scheduleMarkedDone: false,
   };
 }
 
