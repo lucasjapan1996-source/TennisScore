@@ -2185,8 +2185,11 @@ p.row + p,
 }
 
 @media (max-width: 768px) {
-  :root {
+  html:not(.is-standalone) {
     --safe-top: max(env(safe-area-inset-top, 0px), 14px);
+  }
+
+  :root {
     --header-h: calc(2.85rem + var(--safe-top));
     --tab-row-h: 1.78rem;
     --footer-h: 0.6rem;
@@ -2374,46 +2377,90 @@ p.row + p,
   text-align: left;
 }
 
-/* iOS 主屏幕 PWA：全屏 flex 布局，安全区只垫在底栏容器一次 */
+/*
+ * iOS 主屏幕 PWA：不用 100dvh（常高于可见区域导致底部白条），
+ * 用 fixed + inset:0 贴满屏幕，安全区只加在 .app-shell 一层。
+ */
+html.is-standalone,
+html.is-standalone body,
+html.is-standalone #root {
+  height: 100%;
+  min-height: 100%;
+  max-height: none;
+  overflow: hidden;
+}
+
+html.is-standalone #root {
+  display: block;
+}
+
+html.is-standalone {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --footer-h: 0;
+  --tab-row-h: 2.35rem;
+  --tab-icon-size: 1.42rem;
+}
+
+html.is-standalone .app-shell {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(100%, 560px);
+  max-width: 560px;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  margin: 0;
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom)
+    var(--safe-left);
+  box-sizing: border-box;
+}
+
+html.is-standalone .app-header {
+  padding-top: 0.4rem;
+  padding-right: 0.65rem;
+  padding-left: 0.65rem;
+}
+
+html.is-standalone .app-main {
+  padding: 0.35rem 0.6rem;
+}
+
+html.is-standalone .app-footer {
+  display: none;
+}
+
+html.is-standalone .app-bottom-chrome {
+  padding-bottom: 0;
+}
+
+html.is-standalone .tab-bar {
+  padding: 0.1rem 0.4rem 0.06rem;
+}
+
+html.is-standalone .tab-bar button {
+  padding: 0.1rem 0.06rem 0.06rem;
+  gap: 0.08rem;
+  min-height: var(--tab-row-h);
+}
+
+html.is-standalone .tab-bar button .icon {
+  font-size: var(--tab-icon-size);
+}
+
+html.is-standalone .tab-bar button .tab-label {
+  font-size: 0.6rem;
+}
+
 @media (display-mode: standalone) {
   :root {
     --footer-h: 0;
-    --tab-row-h: 2.5rem;
-    --tab-icon-size: 1.5rem;
   }
 
   .app-footer {
     display: none;
-  }
-
-  .app-bottom-chrome {
-    position: static;
-    transform: none;
-    padding-bottom: var(--safe-bottom-inset);
-  }
-
-  .tab-bar {
-    padding-top: 0.12rem;
-    padding-bottom: 0.08rem;
-  }
-
-  .tab-bar button {
-    padding: 0.12rem 0.08rem 0.08rem;
-    gap: 0.1rem;
-    min-height: var(--tab-row-h);
-    justify-content: center;
-  }
-
-  .tab-bar button .icon {
-    font-size: var(--tab-icon-size);
-  }
-
-  .tab-bar button .tab-label {
-    font-size: 0.62rem;
-  }
-
-  .app-main {
-    padding-bottom: 0.35rem;
   }
 }
 

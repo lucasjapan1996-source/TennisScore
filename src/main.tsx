@@ -4,8 +4,10 @@ import { registerSW } from 'virtual:pwa-register';
 import App from './App';
 import { applyTheme, readStoredTheme } from './store/useThemeStore';
 import './index.css';
+import { installStandaloneLayoutClass } from './installStandaloneLayout';
 
 applyTheme(readStoredTheme());
+installStandaloneLayoutClass();
 
 registerSW({ immediate: true });
 
