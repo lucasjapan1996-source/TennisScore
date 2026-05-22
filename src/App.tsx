@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import { syncBottomChromeHeight } from './installStandaloneLayout';
 import { useMobileScrollFix } from './hooks/useMobileScrollFix';
 import { useStrings } from './hooks/useStrings';
 import { PlayerPanel } from './components/PlayerPanel';
@@ -16,6 +18,10 @@ export default function App() {
   const S = useStrings();
 
   const activeTab = useTournamentStore((s) => s.activeTab);
+
+  useEffect(() => {
+    requestAnimationFrame(syncBottomChromeHeight);
+  }, [activeTab]);
   const setActiveTab = useTournamentStore((s) => s.setActiveTab);
   const resetTournament = useTournamentStore((s) => s.resetTournament);
   const tournamentName = useTournamentStore((s) => s.tournament.name);

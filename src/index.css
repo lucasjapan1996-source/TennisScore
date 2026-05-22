@@ -1,4 +1,5 @@
 :root {
+  --font-scale: 1.125;
   --radius: 10px;
   --safe-top-inset: env(safe-area-inset-top, 0px);
   --safe-top: var(--safe-top-inset);
@@ -10,22 +11,28 @@
   --header-h: calc(2.5rem + var(--safe-top-inset) + var(--header-pad-top));
   --tab-row-h: 1.92rem;
   --footer-h: 0.7rem;
-  --tab-icon-size: 1.18rem;
+  --tab-icon-size: 1.28rem;
   /* 底部 Home 指示条：仅垫在固定底栏内，避免与 .app-shell 重复留白 */
   --safe-bottom-inset: env(safe-area-inset-bottom, 0px);
-  --tab-bar-block-h: calc(var(--tab-row-h) + 0.45rem);
-  --bottom-chrome-h: calc(var(--tab-bar-block-h) + var(--footer-h));
+  --tab-bar-btn-min-h: 2.75rem;
+  --tab-bar-padding-y: 0.32rem;
+  --scroll-bottom-gap: 0.75rem;
+  /* 含 Tab + 版权行 + 安全区；运行时会用实测高度覆盖 */
+  --bottom-chrome-h: calc(
+    var(--tab-bar-btn-min-h) + var(--tab-bar-padding-y) + var(--footer-h) +
+      var(--scroll-bottom-gap) + var(--safe-bottom-inset)
+  );
   --btn-gap: 0.5rem;
   --btn-gap-tight: 0.4rem;
   --btn-min-h: 2.5rem;
   --btn-pad-y: 0.5rem;
   --btn-pad-x: 0.8rem;
-  --btn-font: 0.8rem;
+  --btn-font: 0.875rem;
   --toggle-gap: 0.45rem;
   --toggle-min-h: 2.35rem;
   --toggle-pad-y: 0.52rem;
   --toggle-pad-x: 0.45rem;
-  --toggle-font: 0.78rem;
+  --toggle-font: 0.85rem;
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   line-height: 1.4;
 }
@@ -102,6 +109,7 @@
 }
 
 html {
+  font-size: calc(100% * var(--font-scale));
   overflow: hidden;
   width: 100%;
   max-width: 100%;
@@ -182,7 +190,7 @@ textarea {
   border-radius: var(--radius);
   padding: 0.5rem 0.7rem;
   width: 100%;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
 }
 
 textarea {
@@ -241,7 +249,7 @@ textarea:focus {
 
 .app-header-title {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 1.15rem;
   font-weight: 700;
   letter-spacing: 0.01em;
   line-height: 1.25;
@@ -306,8 +314,8 @@ textarea:focus {
   overscroll-behavior-y: contain;
   touch-action: pan-y;
   padding: 0.35rem calc(0.6rem + var(--safe-right))
-    calc(0.35rem + var(--bottom-chrome-h) + var(--safe-bottom-inset))
-    calc(0.6rem + var(--safe-left));
+    calc(0.35rem + var(--bottom-chrome-h)) calc(0.6rem + var(--safe-left));
+  scroll-padding-bottom: calc(0.35rem + var(--bottom-chrome-h));
   width: 100%;
   max-width: 100%;
   background: var(--bg);
@@ -1488,13 +1496,13 @@ select.gender-select-unspecified {
   background: transparent;
   color: var(--muted);
   padding: 0.18rem 0.1rem 0.12rem;
-  font-size: 0.6rem;
+  font-size: 0.675rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 0.1rem;
-  min-height: 2.65rem;
+  min-height: var(--tab-bar-btn-min-h);
   line-height: 1.1;
 }
 
@@ -1507,7 +1515,7 @@ select.gender-select-unspecified {
 
 .tab-bar button .tab-label {
   line-height: 1.1;
-  font-size: 0.58rem;
+  font-size: 0.65rem;
   display: block;
   max-width: 100%;
   overflow: hidden;
@@ -2336,26 +2344,26 @@ p.row + p,
 
 @media (max-width: 380px) {
   .app-header-title {
-    font-size: 0.95rem;
+    font-size: 1.05rem;
   }
 
   .tab-bar button {
-    font-size: 0.6rem;
+    font-size: 0.65rem;
   }
 
   .tab-bar button .icon {
-    font-size: 1.1rem;
+    font-size: 1.2rem;
   }
 }
 
 /* 比赛排名与比赛比分统一字号、横向留白 */
 .ranking-panel-main .rank-table,
 .match-results-panel {
-  font-size: 0.85rem;
+  font-size: 0.9rem;
 }
 
 .ranking-panel-main .rank-table th {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
 }
 
 .match-results-list {
@@ -2474,6 +2482,9 @@ html.is-standalone {
   --header-pad-bottom: 0.28rem;
   --footer-h: 0;
   --tab-row-h: 2.35rem;
+  --tab-bar-btn-min-h: var(--tab-row-h);
+  --tab-bar-padding-y: 0.16rem;
+  --scroll-bottom-gap: 1rem;
   --tab-icon-size: 1.42rem;
 }
 
@@ -2501,7 +2512,9 @@ html.is-standalone .app-header {
 }
 
 html.is-standalone .app-main {
-  padding: 0.35rem 0.6rem;
+  padding: 0.35rem calc(0.6rem + var(--safe-right))
+    calc(0.35rem + var(--bottom-chrome-h)) calc(0.6rem + var(--safe-left));
+  scroll-padding-bottom: calc(0.35rem + var(--bottom-chrome-h));
 }
 
 html.is-standalone .app-footer {
@@ -2527,7 +2540,7 @@ html.is-standalone .tab-bar button .icon {
 }
 
 html.is-standalone .tab-bar button .tab-label {
-  font-size: 0.6rem;
+  font-size: 0.68rem;
 }
 
 @media (display-mode: standalone) {
