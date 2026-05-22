@@ -198,6 +198,8 @@ export const jaStrings: Strings = {
   scheduleMatchesUnit: '試合',
   matrix: '対戦マトリクス',
   matrixTitle: '循環戦のみ：対戦とスコアを一覧',
+  matrixBatchTitle: (batch) =>
+    batch <= 1 ? '対戦マトリクス' : `対戦マトリクス（${batch} 回目）`,
   matrixHint: '横軸＝A、縦軸＝B。数字はスコア、#は試合番号',
   matrixHintShort: 'マトリクスで確認',
   fullScheduleHintShort: '試合一覧',
@@ -208,6 +210,8 @@ export const jaStrings: Strings = {
   matchPendingShort: '未実施',
   goScore: 'スコア入力へ',
   goScoreTitle: 'スコアタブで入力',
+  appendSchedule: '対戦を追加',
+  appendScheduleTitle: '現在のルールで対戦を生成し、一覧の末尾に追加',
 
   sectionKnockout: 'トーナメント',
   knockoutStage: 'トーナメント',
@@ -255,8 +259,10 @@ export const jaStrings: Strings = {
   scoreHintShort: '大＋小、自動保存',
   scoreKnockoutExtraShort: '前段試合を先に',
   scoreHintTitle: '大ポイント・小ポイントの入力ルール',
-  clearScore: 'クリア',
-  clearScoreTitle: 'スコアを消して未実施に戻す',
+  clearScore: 'リセット',
+  clearScoreTitle: 'スコアをリセットして未実施に戻す',
+  matchResultsTitle: '試合スコア',
+  matchResultsTitleHint: '記録済みの対戦スコア一覧',
 
   noRankTitle: '対戦表と1試合以上のスコアが必要',
   noRank: 'スコア入力後に順位が表示されます',
@@ -309,6 +315,8 @@ export const jaStrings: Strings = {
   podiumHintKnockoutShort: '決勝後に表示',
 
   errMinPlayers: '選手は2名以上必要です',
+  errAppendNeedsSchedule: '先に対戦表を生成してください',
+  errAppendNoMatches: '追加できる試合がありません',
   errDoublesEven: 'ダブルスは偶数名必要です',
   errDoublesPartnerMin: 'ダブルスリーグ戦は4名以上必要です',
   errMinTeams: 'ペアは2組以上必要です',

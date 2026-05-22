@@ -118,6 +118,8 @@ export interface Tournament {
   players: Player[];
   teams: Team[];
   matches: Match[];
+  /** 每次生成/追加对阵的场次数量，用于分块展示对阵矩阵 */
+  scheduleBatchSizes: number[];
   createdAt: string;
 }
 

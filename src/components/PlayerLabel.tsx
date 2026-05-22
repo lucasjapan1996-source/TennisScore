@@ -8,7 +8,7 @@ import { GenderSymbol } from './GenderSymbol';
 export function PlayerLabel({
   player,
   showLevel = false,
-  compact = false,
+  compact: _compact = false,
   showGender = true,
 }: {
   player: Player;
@@ -17,16 +17,20 @@ export function PlayerLabel({
   showGender?: boolean;
 }) {
   const S = useStrings();
+  const showMeta = showGender || showLevel;
   return (
     <span className="player-label">
       {player.name}
-      {!compact && showGender && ' '}
-      <GenderSymbol gender={player.gender} visible={showGender} />
-      {showLevel && (
-        <>
-          {' '}
-          <span className="player-level">{S.levelLabel(player.level)}</span>
-        </>
+      {showMeta && (
+        <span className="player-meta">
+          {' ('}
+          {showGender && <GenderSymbol gender={player.gender} />}
+          {showGender && showLevel && ' '}
+          {showLevel && (
+            <span className="player-level">{S.levelLabel(player.level)}</span>
+          )}
+          {')'}
+        </span>
       )}
     </span>
   );

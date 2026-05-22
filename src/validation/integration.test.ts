@@ -6,6 +6,7 @@ import type { Match, Player, Tournament } from '../types';
 import {
   buildGroupStageSchedule,
   buildKnockoutOnlySchedule,
+  appendScheduleMatches,
   buildRoundRobinSchedule,
   estimateMatchCount,
   validateBeforeSchedule,
@@ -16,6 +17,7 @@ import {
   isNumberedBulkName,
   MAX_BULK_PLAYER_COUNT,
 } from '../utils/bulkPlayers';
+import { formatScheduleMatchLine } from '../utils/player';
 import { resolveMatchBestOf, tournamentHasFinal } from '../utils/bestOf';
 import { computeStandings } from '../utils/ranking';
 import { computePodium } from '../utils/podium';
@@ -55,6 +57,7 @@ function baseTournament(overrides: Partial<Tournament> = {}): Tournament {
     players: [],
     teams: [],
     matches: [],
+    scheduleBatchSizes: [],
     createdAt: new Date().toISOString(),
     ...overrides,
   };
@@ -119,6 +122,35 @@ describe('schedule formats (simulated)', () => {
     expect(matches.length).toBe(6);
     expect(estimateMatchCount(4, 'round_robin', 2)).toBe(6);
     expect(validateBeforeSchedule('singles', players, [], 'round_robin', 2)).toBeNull();
+  });
+
+  it('append schedule doubles batch with continued order', () => {
+    const p4 = mockPlayers(4);
+    const { matches: initial } = buildRoundRobinSchedule(
+      p4,
+      [],
+      'doubles',
+      'sequential',
+      'rotating',
+    );
+    expect(initial.length).toBe(3);
+    expect(formatScheduleMatchLine(initial[0].sideAIds, initial[0].sideBIds, p4, 'doubles')).toMatch(
+      /^\d+&\d+ vs \d+&\d+$/,
+    );
+    const { matches, appendedCount } = appendScheduleMatches(
+      initial,
+      p4,
+      [],
+      'doubles',
+      'round_robin',
+      2,
+      'sequential',
+      'rotating',
+    );
+    expect(appendedCount).toBe(3);
+    expect(matches.length).toBe(6);
+    expect(matches[3].order).toBe(4);
+    expect(matches[5].order).toBe(6);
   });
 
   it('knockout only: 4 players → 3 matches (semi+final)', () => {

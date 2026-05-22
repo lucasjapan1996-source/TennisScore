@@ -366,6 +366,28 @@ export function groupMatchesBySection(
   return map;
 }
 
+/** 按 scheduleBatchSizes 切分对阵批次（用于多块对阵矩阵） */
+export function splitMatchesByBatches(
+  matches: Match[],
+  batchSizes: number[],
+): Match[][] {
+  const sorted = [...matches].sort((a, b) => a.order - b.order);
+  if (sorted.length === 0) return [];
+  if (batchSizes.length === 0) return [sorted];
+
+  const batches: Match[][] = [];
+  let cursor = 0;
+  for (const size of batchSizes) {
+    if (size <= 0) continue;
+    batches.push(sorted.slice(cursor, cursor + size));
+    cursor += size;
+  }
+  if (cursor < sorted.length) {
+    batches.push(sorted.slice(cursor));
+  }
+  return batches.filter((b) => b.length > 0);
+}
+
 export function matchPairKey(sideAIds: string[], sideBIds: string[]): string {
   const a = [...sideAIds].sort().join(',');
   const b = [...sideBIds].sort().join(',');
@@ -507,4 +529,80 @@ export function buildKnockoutOnlySchedule(
 ): ScheduleResult {
   const result = buildPureKnockoutSchedule(players, teams, mode, seedMode);
   return { matches: result.matches, groups: [] };
+}
+
+/** 按当前赛事设置生成完整对阵（与「生成对阵」相同规则） */
+export function buildScheduleFromSettings(
+  players: Player[],
+  teams: Team[],
+  mode: MatchMode,
+  scheduleFormat: ScheduleFormat,
+  groupCount: number,
+  seedMode: ScheduleSeedMode,
+  doublesPairing: DoublesPairing,
+): ScheduleResult {
+  const scheduleTeams =
+    mode === 'doubles' && doublesPairing === 'rotating'
+      ? buildDoublesTeamsFromPlayers(players, seedMode)
+      : teams;
+  if (scheduleFormat === 'group_stage') {
+    return buildGroupStageSchedule(
+      players,
+      scheduleTeams,
+      mode,
+      groupCount,
+      seedMode,
+    );
+  }
+  if (scheduleFormat === 'knockout') {
+    return buildKnockoutOnlySchedule(
+      players,
+      scheduleTeams,
+      mode,
+      seedMode,
+    );
+  }
+  return buildRoundRobinSchedule(
+    players,
+    scheduleTeams,
+    mode,
+    seedMode,
+    doublesPairing,
+  );
+}
+
+/** 在现有对阵后追加一批（同规则完整生成，场次序号续编） */
+export function appendScheduleMatches(
+  existingMatches: Match[],
+  players: Player[],
+  teams: Team[],
+  mode: MatchMode,
+  scheduleFormat: ScheduleFormat,
+  groupCount: number,
+  seedMode: ScheduleSeedMode,
+  doublesPairing: DoublesPairing,
+): { matches: Match[]; groups: GroupAssignment[]; appendedCount: number } {
+  const batch = buildScheduleFromSettings(
+    players,
+    teams,
+    mode,
+    scheduleFormat,
+    groupCount,
+    seedMode,
+    doublesPairing,
+  );
+  const maxOrder = existingMatches.reduce(
+    (max, m) => Math.max(max, m.order),
+    0,
+  );
+  const appended = batch.matches.map((m, i) => ({
+    ...m,
+    id: uid(),
+    order: maxOrder + i + 1,
+  }));
+  return {
+    matches: [...existingMatches, ...appended],
+    groups: batch.groups,
+    appendedCount: appended.length,
+  };
 }

@@ -47,9 +47,8 @@ import {
   applyTeamPairChange,
   autoPairPlayers,
   buildDoublesTeamsFromPlayers,
-  buildGroupStageSchedule,
-  buildKnockoutOnlySchedule,
-  buildRoundRobinSchedule,
+  appendScheduleMatches,
+  buildScheduleFromSettings,
   validateBeforeSchedule,
 } from '../utils/schedule';
 import {
@@ -94,6 +93,7 @@ function emptyTournament(): Tournament {
     players: [],
     teams: [],
     matches: [],
+    scheduleBatchSizes: [],
     createdAt: now,
   };
 }
@@ -129,6 +129,7 @@ interface TournamentState {
   ) => void;
   setTeamPair: (teamIndex: number, playerAId: string, playerBId: string) => void;
   generateSchedule: () => string | null;
+  appendSchedule: () => string | null;
   updateMatchScore: (
     matchId: string,
     scoreA: number,
@@ -185,6 +186,7 @@ export const useTournamentStore = create<TournamentState>()(
               teams,
               matches: [],
               groups: [],
+              scheduleBatchSizes: [],
             },
           };
         }),
@@ -203,6 +205,7 @@ export const useTournamentStore = create<TournamentState>()(
               teams,
               matches: [],
               groups: [],
+              scheduleBatchSizes: [],
             },
           };
         }),
@@ -222,6 +225,7 @@ export const useTournamentStore = create<TournamentState>()(
                   : s.tournament.bestOf,
               matches: [],
               groups: [],
+              scheduleBatchSizes: [],
             },
           };
         }),
@@ -240,6 +244,7 @@ export const useTournamentStore = create<TournamentState>()(
               bestOfMode,
               matches: [],
               groups: [],
+              scheduleBatchSizes: [],
             },
           };
         }),
@@ -251,6 +256,7 @@ export const useTournamentStore = create<TournamentState>()(
             bestOf,
             matches: [],
             groups: [],
+            scheduleBatchSizes: [],
           },
         })),
 
@@ -261,6 +267,7 @@ export const useTournamentStore = create<TournamentState>()(
             customBestOfDefault,
             matches: [],
             groups: [],
+            scheduleBatchSizes: [],
           },
         })),
 
@@ -271,6 +278,7 @@ export const useTournamentStore = create<TournamentState>()(
             customBestOfFinal,
             matches: [],
             groups: [],
+            scheduleBatchSizes: [],
           },
         })),
 
@@ -281,6 +289,7 @@ export const useTournamentStore = create<TournamentState>()(
             groupCount: Math.max(2, Math.min(32, groupCount)),
             matches: [],
             groups: [],
+            scheduleBatchSizes: [],
           },
         })),
 
@@ -305,6 +314,7 @@ export const useTournamentStore = create<TournamentState>()(
               teams,
               matches: [],
               groups: [],
+              scheduleBatchSizes: [],
             },
           };
         });
@@ -332,6 +342,7 @@ export const useTournamentStore = create<TournamentState>()(
               teams,
               matches: [],
               groups: [],
+              scheduleBatchSizes: [],
             },
           };
         });
@@ -351,7 +362,15 @@ export const useTournamentStore = create<TournamentState>()(
               !m.sideBIds.some((pid) => idSet.has(pid)),
           );
           return {
-            tournament: { ...s.tournament, players, teams, matches, groups: [] },
+            tournament: {
+              ...s.tournament,
+              players,
+              teams,
+              matches,
+              groups: [],
+              scheduleBatchSizes:
+                matches.length > 0 ? [matches.length] : [],
+            },
           };
         });
       },
@@ -364,6 +383,7 @@ export const useTournamentStore = create<TournamentState>()(
             teams: [],
             matches: [],
             groups: [],
+            scheduleBatchSizes: [],
           },
         })),
 
@@ -378,7 +398,15 @@ export const useTournamentStore = create<TournamentState>()(
               !m.sideAIds.includes(id) && !m.sideBIds.includes(id),
           );
           return {
-            tournament: { ...s.tournament, players, teams, matches, groups: [] },
+            tournament: {
+              ...s.tournament,
+              players,
+              teams,
+              matches,
+              groups: [],
+              scheduleBatchSizes:
+                matches.length > 0 ? [matches.length] : [],
+            },
           };
         }),
 
@@ -410,6 +438,7 @@ export const useTournamentStore = create<TournamentState>()(
               teams: nextTeams,
               matches: [],
               groups: [],
+              scheduleBatchSizes: [],
             },
           };
         }),
@@ -427,40 +456,85 @@ export const useTournamentStore = create<TournamentState>()(
         if (err) return err;
 
         const seedMode = tournament.scheduleSeedMode;
+        const result = buildScheduleFromSettings(
+          tournament.players,
+          tournament.teams,
+          tournament.mode,
+          tournament.scheduleFormat,
+          tournament.groupCount,
+          seedMode,
+          tournament.doublesPairing,
+        );
         const scheduleTeams =
           tournament.mode === 'doubles' &&
           tournament.doublesPairing === 'rotating'
             ? buildDoublesTeamsFromPlayers(tournament.players, seedMode)
             : tournament.teams;
-        const result =
-          tournament.scheduleFormat === 'group_stage'
-            ? buildGroupStageSchedule(
-                tournament.players,
-                scheduleTeams,
-                tournament.mode,
-                tournament.groupCount,
-                seedMode,
-              )
-            : tournament.scheduleFormat === 'knockout'
-              ? buildKnockoutOnlySchedule(
-                  tournament.players,
-                  scheduleTeams,
-                  tournament.mode,
-                  seedMode,
-                )
-              : buildRoundRobinSchedule(
-                  tournament.players,
-                  scheduleTeams,
-                  tournament.mode,
-                  seedMode,
-                  tournament.doublesPairing,
-                );
 
         set((s) => ({
           tournament: {
             ...s.tournament,
             matches: result.matches,
             groups: result.groups,
+            scheduleBatchSizes: [result.matches.length],
+            teams:
+              tournament.mode === 'doubles' &&
+              tournament.doublesPairing === 'rotating'
+                ? scheduleTeams
+                : s.tournament.teams,
+          },
+        }));
+        return null;
+      },
+
+      appendSchedule: () => {
+        const { tournament } = get();
+        if (tournament.matches.length === 0) {
+          return getActiveStrings().errAppendNeedsSchedule;
+        }
+        const err = validateBeforeSchedule(
+          tournament.mode,
+          tournament.players,
+          tournament.teams,
+          tournament.scheduleFormat,
+          tournament.groupCount,
+          tournament.doublesPairing,
+        );
+        if (err) return err;
+
+        const { matches, groups, appendedCount } = appendScheduleMatches(
+          tournament.matches,
+          tournament.players,
+          tournament.teams,
+          tournament.mode,
+          tournament.scheduleFormat,
+          tournament.groupCount,
+          tournament.scheduleSeedMode,
+          tournament.doublesPairing,
+        );
+        if (appendedCount === 0) {
+          return getActiveStrings().errAppendNoMatches;
+        }
+
+        const seedMode = tournament.scheduleSeedMode;
+        const scheduleTeams =
+          tournament.mode === 'doubles' &&
+          tournament.doublesPairing === 'rotating'
+            ? buildDoublesTeamsFromPlayers(tournament.players, seedMode)
+            : tournament.teams;
+
+        set((s) => ({
+          tournament: {
+            ...s.tournament,
+            matches,
+            groups:
+              s.tournament.groups.length > 0
+                ? s.tournament.groups
+                : groups,
+            scheduleBatchSizes: [
+              ...s.tournament.scheduleBatchSizes,
+              appendedCount,
+            ],
             teams:
               tournament.mode === 'doubles' &&
               tournament.doublesPairing === 'rotating'
@@ -744,6 +818,18 @@ export const useTournamentStore = create<TournamentState>()(
               const bo = resolveMatchBestOf(row, bestOfCtx);
               return sanitizeRetiredMatch(row, bo);
               });
+            })(),
+            scheduleBatchSizes: (() => {
+              const sizes = (raw as Tournament).scheduleBatchSizes;
+              if (
+                Array.isArray(sizes) &&
+                sizes.length > 0 &&
+                sizes.every((n) => typeof n === 'number' && n > 0)
+              ) {
+                return sizes;
+              }
+              const count = (raw.matches ?? []).length;
+              return count > 0 ? [count] : [];
             })(),
           },
         };

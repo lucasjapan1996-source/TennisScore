@@ -13,10 +13,13 @@ import type {
   TournamentCategory,
 } from '../types';
 import type { ResolveSidesTournament } from '../utils/knockout';
-import { groupMatchesBySection, matchPairKey } from '../utils/schedule';
-import { formatSideCompactLabel } from '../utils/player';
+import {
+  groupMatchesBySection,
+  matchPairKey,
+  splitMatchesByBatches,
+} from '../utils/schedule';
+import { formatScheduleMatchLine, formatSideCompactLabel } from '../utils/player';
 import { showPlayerGender } from '../utils/tournamentCategory';
-import { renderMatchSides } from './PlayerLabel';
 import { knockoutMatchLabel, resolveMatchSides } from '../utils/knockout';
 import {
   formatMatchScore,
@@ -39,6 +42,8 @@ interface ScheduleOverviewProps {
   teams: Team[];
   groups: GroupAssignment[];
   matches: Match[];
+  scheduleBatchSizes?: number[];
+  onAppendSchedule?: () => void;
   onGoScore?: () => void;
 }
 
@@ -87,6 +92,8 @@ export function ScheduleOverview({
   teams,
   groups,
   matches,
+  scheduleBatchSizes = [],
+  onAppendSchedule,
   onGoScore,
 }: ScheduleOverviewProps) {
   const resolveCtx: ResolveSidesTournament = {
@@ -124,18 +131,24 @@ export function ScheduleOverview({
     });
   }, [matches, isGroupStage, isKnockoutOnly]);
 
-  const matchLookup = useMemo(() => {
-    const map = new Map<string, Match>();
-    for (const m of matches) {
-      map.set(matchPairKey(m.sideAIds, m.sideBIds), m);
-    }
-    return map;
-  }, [matches]);
-
   const entities = useMemo(
     () => buildMatrixEntities(mode, players, teams),
     [mode, players, teams],
   );
+
+  const showMatrix =
+    !isGroupStage &&
+    !isKnockoutOnly &&
+    entities.length >= 2 &&
+    entities.length <= 10;
+
+  const matrixBatches = useMemo(() => {
+    if (!showMatrix) return [];
+    const rrMatches = matches.filter(
+      (m) => m.phase !== 'knockout' && m.group === null,
+    );
+    return splitMatchesByBatches(rrMatches, scheduleBatchSizes);
+  }, [showMatrix, matches, scheduleBatchSizes]);
 
   const doneCount = matches.filter((m) => isMatchPlayed(m)).length;
 
@@ -168,76 +181,31 @@ export function ScheduleOverview({
         </span>
       </p>
 
-      {!isGroupStage && !isKnockoutOnly && entities.length >= 2 && entities.length <= 10 && (
-        <details className="schedule-matrix-wrap" open={entities.length <= 6}>
+      {showMatrix && matrixBatches.length > 0 && (
+        <details
+          className="schedule-matrix-wrap"
+          open={entities.length <= 6}
+        >
           <summary title={S.matrixTitle}>{S.matrix}</summary>
-          <div className="matrix-scroll">
-            <table className="matrix-table">
-              <thead>
-                <tr>
-                  <th className="matrix-corner" />
-                  {entities.map((e) => (
-                    <th key={e.id} title={e.label}>
-                      <span className="matrix-head">{abbreviate(e.label)}</span>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {entities.map((row, ri) => (
-                  <tr key={row.id}>
-                    <th title={row.label}>
-                      <span className="matrix-row-head">{abbreviate(row.label)}</span>
-                    </th>
-                    {entities.map((col, ci) => {
-                      if (ri === ci) {
-                        return (
-                          <td key={col.id} className="matrix-diag">
-                            —
-                          </td>
-                        );
-                      }
-                      const sideA =
-                        mode === 'singles' ? [row.id] : row.id.split(',');
-                      const sideB =
-                        mode === 'singles' ? [col.id] : col.id.split(',');
-                      const m = matchLookup.get(matchPairKey(sideA, sideB));
-                      if (!m) {
-                        return (
-                          <td key={col.id} className="matrix-empty">
-                            ·
-                          </td>
-                        );
-                      }
-                      const rowSideIds =
-                        mode === 'singles' ? [row.id] : row.id.split(',');
-                      const score = formatMatchScoreForRow(m, rowSideIds);
-                      const done = score !== '';
-                      return (
-                        <td
-                          key={col.id}
-                          className={done ? 'matrix-done' : 'matrix-pending'}
-                          title={S.matrixCellTitle(
-                            row.label,
-                            col.label,
-                            m.order,
-                            score,
-                          )}
-                        >
-                          {done ? (
-                            <span className="matrix-score">{score}</span>
-                          ) : (
-                            <span className="matrix-round">
-                              {S.matrixPendingOrder(m.order)}
-                            </span>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="schedule-matrix-inner">
+            {matrixBatches.map((batchMatches, batchIndex) => (
+              <div
+                key={batchIndex}
+                className="schedule-matrix-batch"
+                data-batch={batchIndex + 1}
+              >
+                {matrixBatches.length > 1 && (
+                  <p className="schedule-matrix-batch-label">
+                    {S.matrixBatchTitle(batchIndex + 1)}
+                  </p>
+                )}
+                <ScheduleMatrixTable
+                  batchMatches={batchMatches}
+                  entities={entities}
+                  mode={mode}
+                />
+              </div>
+            ))}
           </div>
         </details>
       )}
@@ -256,42 +224,16 @@ export function ScheduleOverview({
             <ol className="schedule-match-list">
               {sectionMatches.map((m) => {
                 const resolved = resolveMatchSides(m, resolveCtx, compactLabel);
-                const sideA =
-                  resolved.ready && m.sideAIds.length > 0
-                    ? renderMatchSides(
-                        m.sideAIds,
-                        players,
-                        mode,
-                        teams,
-                        genderVisible,
-                      )
-                    : m.phase === 'knockout'
-                      ? resolved.labelA
-                      : renderMatchSides(
-                          m.sideAIds,
-                          players,
-                          mode,
-                          teams,
-                          genderVisible,
-                        );
-                const sideB =
-                  resolved.ready && m.sideBIds.length > 0
-                    ? renderMatchSides(
-                        m.sideBIds,
-                        players,
-                        mode,
-                        teams,
-                        genderVisible,
-                      )
-                    : m.phase === 'knockout'
-                      ? resolved.labelB
-                      : renderMatchSides(
-                          m.sideBIds,
-                          players,
-                          mode,
-                          teams,
-                          genderVisible,
-                        );
+                const canFormatLine =
+                  m.sideAIds.length > 0 && m.sideBIds.length > 0;
+                const matchupLine = canFormatLine
+                  ? formatScheduleMatchLine(
+                      m.sideAIds,
+                      m.sideBIds,
+                      players,
+                      mode,
+                    )
+                  : `${resolved.labelA} vs ${resolved.labelB}`;
                 const score = m.isBye ? S.knockoutByeShort : formatMatchScore(m);
                 const done = m.isBye || score !== '';
                 const stageLabel =
@@ -304,10 +246,8 @@ export function ScheduleOverview({
                     <span className="schedule-match-no" title={S.matchNoTitle(m.order)}>
                       {stageLabel ?? m.order}
                     </span>
-                    <span className="schedule-match-sides">
-                      <span className="schedule-side-a">{sideA}</span>
-                      <span className="schedule-vs">VS</span>
-                      <span className="schedule-side-b">{sideB}</span>
+                    <span className="schedule-match-line" title={matchupLine}>
+                      {matchupLine}
                     </span>
                     <span
                       className={`schedule-match-status${done ? ' scored' : ''}`}
@@ -322,16 +262,28 @@ export function ScheduleOverview({
         ))}
       </div>
 
-      {onGoScore && (
-        <p className="btn-row">
-          <button
-            type="button"
-            className="btn-primary btn-block"
-            onClick={onGoScore}
-            title={S.goScoreTitle}
-          >
-            {S.goScore}
-          </button>
+      {(onAppendSchedule || onGoScore) && (
+        <p className="btn-row btn-row-schedule-actions">
+          {onAppendSchedule && (
+            <button
+              type="button"
+              className="btn-secondary btn-schedule-action"
+              onClick={onAppendSchedule}
+              title={S.appendScheduleTitle}
+            >
+              {S.appendSchedule}
+            </button>
+          )}
+          {onGoScore && (
+            <button
+              type="button"
+              className="btn-primary btn-schedule-action"
+              onClick={onGoScore}
+              title={S.goScoreTitle}
+            >
+              {S.goScore}
+            </button>
+          )}
         </p>
       )}
     </CollapsiblePanel>
@@ -341,4 +293,94 @@ export function ScheduleOverview({
 function abbreviate(label: string, max = 6): string {
   if (label.length <= max) return label;
   return `${label.slice(0, max - 1)}…`;
+}
+
+function ScheduleMatrixTable({
+  batchMatches,
+  entities,
+  mode,
+}: {
+  batchMatches: Match[];
+  entities: MatrixEntity[];
+  mode: MatchMode;
+}) {
+  const S = getActiveStrings();
+  const matchLookup = useMemo(() => {
+    const map = new Map<string, Match>();
+    for (const m of batchMatches) {
+      map.set(matchPairKey(m.sideAIds, m.sideBIds), m);
+    }
+    return map;
+  }, [batchMatches]);
+
+  return (
+    <div className="matrix-scroll">
+      <table className="matrix-table">
+          <thead>
+            <tr>
+              <th className="matrix-corner" />
+              {entities.map((e) => (
+                <th key={e.id} title={e.label}>
+                  <span className="matrix-head">{abbreviate(e.label)}</span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {entities.map((row) => (
+              <tr key={row.id}>
+                <th title={row.label}>
+                  <span className="matrix-row-head">{abbreviate(row.label)}</span>
+                </th>
+                {entities.map((col) => {
+                  if (row.id === col.id) {
+                    return (
+                      <td key={col.id} className="matrix-diag">
+                        —
+                      </td>
+                    );
+                  }
+                  const sideA =
+                    mode === 'singles' ? [row.id] : row.id.split(',');
+                  const sideB =
+                    mode === 'singles' ? [col.id] : col.id.split(',');
+                  const m = matchLookup.get(matchPairKey(sideA, sideB));
+                  if (!m) {
+                    return (
+                      <td key={col.id} className="matrix-empty">
+                        ·
+                      </td>
+                    );
+                  }
+                  const rowSideIds =
+                    mode === 'singles' ? [row.id] : row.id.split(',');
+                  const score = formatMatchScoreForRow(m, rowSideIds);
+                  const done = score !== '';
+                  return (
+                    <td
+                      key={col.id}
+                      className={done ? 'matrix-done' : 'matrix-pending'}
+                      title={S.matrixCellTitle(
+                        row.label,
+                        col.label,
+                        m.order,
+                        score,
+                      )}
+                    >
+                      {done ? (
+                        <span className="matrix-score">{score}</span>
+                      ) : (
+                        <span className="matrix-round">
+                          {S.matrixPendingOrder(m.order)}
+                        </span>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+      </table>
+    </div>
+  );
 }

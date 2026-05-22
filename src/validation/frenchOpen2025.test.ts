@@ -47,6 +47,7 @@ function baseTournament(matches: Match[], players: Player[] = PLAYERS): Tourname
     players,
     teams: [],
     matches,
+    scheduleBatchSizes: matches.length > 0 ? [matches.length] : [],
     createdAt: new Date().toISOString(),
   };
 }

@@ -8,6 +8,7 @@ import { computePodium } from '../utils/podium';
 import { isMatchPlayed } from '../utils/score';
 import { withoutThirdPlaceMatches } from '../utils/schedule';
 import { PodiumDisplay } from './PodiumDisplay';
+import { MatchResultsCard } from './MatchResultsCard';
 import { renderStandingName } from './PlayerLabel';
 import { useStrings } from '../hooks/useStrings';
 import type { DoublesPairing, MatchMode, Player, ScheduleFormat, StandingRow, Team } from '../types';
@@ -29,6 +30,12 @@ export function RankingPanel() {
       : tournament.category === 'mixed'
         ? S.categoryMixed
         : S.categoryMen;
+
+  const rankingTitle = isGroupStage
+    ? S.rankingGroupStage
+    : isKnockoutOnly
+      ? S.rankingKnockout
+      : S.ranking;
 
   const activeMatches = useMemo(
     () => withoutThirdPlaceMatches(tournament.matches, tournament.scheduleFormat),
@@ -53,9 +60,7 @@ export function RankingPanel() {
     [
       isGroupStage,
       isKnockoutOnly,
-      tournament.mode,
-      tournament.players,
-      tournament.teams,
+      tournament,
       activeMatches,
     ],
   );
@@ -71,15 +76,13 @@ export function RankingPanel() {
             tournament,
           )
         : [],
-    [
-      isGroupStage,
-      isKnockoutOnly,
-      tournament.mode,
-      tournament.players,
-      tournament.teams,
-      activeMatches,
-    ],
+    [isGroupStage, isKnockoutOnly, tournament, activeMatches],
   );
+
+  const standings =
+    isGroupStage || isKnockoutOnly
+      ? combinedStandings
+      : roundRobinStandings;
 
   if (activeMatches.length === 0) {
     return (
@@ -123,15 +126,11 @@ export function RankingPanel() {
       )}
 
       <CollapsiblePanel
-        title={
-          isGroupStage
-            ? S.rankingGroupStage
-            : isKnockoutOnly
-              ? S.rankingKnockout
-              : S.ranking
-        }
+        title={rankingTitle}
         titleTitle={S.rankingTitle}
         compact
+        defaultOpen
+        className="ranking-panel-main"
       >
         <p className="stats-bar">
           <span className="stat-pill">
@@ -146,38 +145,13 @@ export function RankingPanel() {
             <strong>{categoryLabel}</strong>
           </span>
         </p>
-      </CollapsiblePanel>
-
-      {isGroupStage || isKnockoutOnly ? (
-        <CollapsiblePanel
-          title={S.groupStandingsAll}
-          className="group-standings-panel"
-        >
-          {combinedStandings.length === 0 ? (
-            <p className="empty-state">{S.noData}</p>
-          ) : (
-            <StandingsTable
-              rows={combinedStandings}
-              rankByPlayer={rankByPlayer}
-              players={tournament.players}
-              teams={tournament.teams}
-              mode={tournament.mode}
-              scheduleFormat={tournament.scheduleFormat}
-              doublesPairing={tournament.doublesPairing}
-              showGender={genderVisible}
-            />
-          )}
-        </CollapsiblePanel>
-      ) : roundRobinStandings.length === 0 ? (
-        <CollapsiblePanel title={S.ranking} titleTitle={S.rankingTitle}>
+        {standings.length === 0 ? (
           <p className="empty-state" title={S.noDataTitle}>
             {S.noData}
           </p>
-        </CollapsiblePanel>
-      ) : (
-        <CollapsiblePanel title={S.ranking} titleTitle={S.rankingTitle}>
+        ) : (
           <StandingsTable
-            rows={roundRobinStandings}
+            rows={standings}
             rankByPlayer={rankByPlayer}
             players={tournament.players}
             teams={tournament.teams}
@@ -186,8 +160,10 @@ export function RankingPanel() {
             doublesPairing={tournament.doublesPairing}
             showGender={genderVisible}
           />
-        </CollapsiblePanel>
-      )}
+        )}
+      </CollapsiblePanel>
+
+      <MatchResultsCard />
     </>
   );
 }

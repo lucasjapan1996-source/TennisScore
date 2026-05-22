@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { ScoreRefreshButton } from './ScoreRefreshButton';
 import { useStrings } from '../hooks/useStrings';
 import type { SetScore } from '../types';
 import { isCompleteSetScore } from '../utils/sets';
@@ -61,6 +62,8 @@ export function SetSeriesScoreForm({
   onSaveSets,
   onClear,
   readOnly = false,
+  clearTitle,
+  clearLabel,
 }: {
   matchId: string;
   labelA: ReactNode;
@@ -72,6 +75,8 @@ export function SetSeriesScoreForm({
   onSaveSets: (id: string, sets: SetScore[]) => void;
   onClear: (id: string) => void;
   readOnly?: boolean;
+  clearTitle: string;
+  clearLabel: string;
 }) {
   const S = useStrings();
   const completed = useMemo(() => sets.filter(isCompleteSetScore), [sets]);
@@ -103,7 +108,7 @@ export function SetSeriesScoreForm({
 
   if (showMatchResultOnly) {
     return (
-      <div className="set-series-form score-form-readonly">
+      <div className="score-form-score-block set-series-form score-form-readonly">
         <div className="set-series-match-result" aria-label="match result">
           <span className="set-series-match-score">{scoreA}</span>
           <span className="score-colon set-cell-sep" aria-hidden>
@@ -117,8 +122,9 @@ export function SetSeriesScoreForm({
 
   return (
     <div
-      className={`set-series-form${readOnly ? ' score-form-readonly' : ''}`}
+      className={`score-form-score-block set-series-form${readOnly ? ' score-form-readonly' : ''}`}
     >
+      <div className="set-series-rows">
       {Array.from({ length: bestOf }, (_, index) => {
         const draft = drafts[index] ?? emptyDraft();
         return (
@@ -145,7 +151,7 @@ export function SetSeriesScoreForm({
               disabled={readOnly}
               readOnly={readOnly}
               onChange={(e) => updateRow(index, { tiebreakA: e.target.value })}
-              placeholder="·"
+              placeholder="0"
               aria-label={`${S.setN(index + 1)} ${labelA} tiebreak`}
             />
             <span className="score-colon set-cell-sep" aria-hidden>
@@ -172,21 +178,19 @@ export function SetSeriesScoreForm({
               disabled={readOnly}
               readOnly={readOnly}
               onChange={(e) => updateRow(index, { tiebreakB: e.target.value })}
-              placeholder="·"
+              placeholder="0"
               aria-label={`${S.setN(index + 1)} ${labelB} tiebreak`}
             />
           </div>
         );
       })}
+      </div>
       {!readOnly && (completed.length > 0 || sets.length > 0) && (
-        <button
-          type="button"
-          className="btn-clear-score set-series-clear"
+        <ScoreRefreshButton
           onClick={() => onClear(matchId)}
-          title={S.clearScoreTitle}
-        >
-          {S.clearScore}
-        </button>
+          title={clearTitle}
+          ariaLabel={clearLabel}
+        />
       )}
     </div>
   );

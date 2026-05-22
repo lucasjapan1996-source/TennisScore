@@ -45,16 +45,13 @@ export function PodiumDisplay({
 }) {
   const S = useStrings();
   const placeMeta = {
-    1: { className: 'podium-1', label: S.podiumGold, iconKind: 'trophy' as const },
-    2: { className: 'podium-2', label: S.podiumSilver, iconKind: 'plate' as const },
+    1: { className: 'podium-1', iconKind: 'trophy' as const },
+    2: { className: 'podium-2', iconKind: 'plate' as const },
   } as const;
   const byPlace = new Map(places.map((p) => [p.place, p]));
 
   return (
-    <section className="podium-wrap" title={S.podiumTitle}>
-      <h3 className="podium-heading" title={S.podiumTitle}>
-        {S.podiumTitle}
-      </h3>
+    <div className="podium-wrap" aria-label={S.podiumTitle}>
       <div className="podium podium-dual">
         {PODIUM_ORDER.map((place) => {
           const entry = byPlace.get(place);
@@ -66,29 +63,34 @@ export function PodiumDisplay({
               key={place}
               className={`podium-place ${meta.className}${ready ? ' ready' : ''}`}
             >
-              <PodiumIcon
-                kind={meta.iconKind}
-                goldTitle={S.podiumGold}
-                silverTitle={S.podiumSilver}
-              />
-              <span className="podium-rank-label">{meta.label}</span>
-              <p className="podium-name">
-                {ready && entry?.sideIds ? (
-                  renderMatchSides(
-                    entry.sideIds,
-                    players,
-                    mode,
-                    teams,
-                    showGender,
-                  )
-                ) : (
-                  <span className="podium-pending">{S.podiumPending}</span>
-                )}
-              </p>
+              <div className="podium-pedestal">
+                <div className="podium-name-slot">
+                  {ready && entry?.sideIds ? (
+                    <span className="podium-name">
+                      {renderMatchSides(
+                        entry.sideIds,
+                        players,
+                        mode,
+                        teams,
+                        showGender,
+                      )}
+                    </span>
+                  ) : (
+                    <span className="podium-pending">{S.podiumPending}</span>
+                  )}
+                </div>
+                <div className="podium-pedestal-face">
+                  <PodiumIcon
+                    kind={meta.iconKind}
+                    goldTitle={S.podiumGold}
+                    silverTitle={S.podiumSilver}
+                  />
+                </div>
+              </div>
             </article>
           );
         })}
       </div>
-    </section>
+    </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { MatchRetirementActions } from './MatchRetirementActions';
 import { ScoreMatchupBar } from './ScoreMatchupBar';
+import { ScoreRefreshButton } from './ScoreRefreshButton';
 import { SetSeriesScoreForm } from './SetSeriesScoreForm';
 import { useStrings } from '../hooks/useStrings';
 import type { BestOf, SetScore } from '../types';
@@ -59,39 +60,45 @@ export function ScoreForm({
 
   return (
     <div className="score-form-wrap">
-      <ScoreMatchupBar labelA={labelA} labelB={labelB} />
       {waitingDisabled ? (
         <p className="hint knockout-waiting" title={disabledHint}>
           {disabledHint ?? S.knockoutLocked}
         </p>
-      ) : bestOf > 1 && onSaveSets ? (
-        <SetSeriesScoreForm
-          matchId={matchId}
-          labelA={labelA}
-          labelB={labelB}
-          sets={sets}
-          scoreA={scoreA}
-          scoreB={scoreB}
-          bestOf={bestOf as 3 | 5}
-          onSaveSets={onSaveSets}
-          onClear={onClear}
-          readOnly={readOnly}
-        />
       ) : (
-        <Bo1ScoreForm
-          matchId={matchId}
-          labelA={labelA}
-          labelB={labelB}
-          scoreA={scoreA}
-          scoreB={scoreB}
-          tiebreakA={tiebreakA}
-          tiebreakB={tiebreakB}
-          onSave={onSave}
-          onClear={onClear}
-          readOnly={readOnly}
-          clearLabel={S.clearScore}
-          clearTitle={S.clearScoreTitle}
-        />
+        <div className="score-form-main-row">
+          <ScoreMatchupBar labelA={labelA} labelB={labelB} />
+          {bestOf > 1 && onSaveSets ? (
+            <SetSeriesScoreForm
+              matchId={matchId}
+              labelA={labelA}
+              labelB={labelB}
+              sets={sets}
+              scoreA={scoreA}
+              scoreB={scoreB}
+              bestOf={bestOf as 3 | 5}
+              onSaveSets={onSaveSets}
+              onClear={onClear}
+              readOnly={readOnly}
+              clearTitle={S.clearScoreTitle}
+              clearLabel={S.clearScore}
+            />
+          ) : (
+            <Bo1ScoreForm
+              matchId={matchId}
+              labelA={labelA}
+              labelB={labelB}
+              scoreA={scoreA}
+              scoreB={scoreB}
+              tiebreakA={tiebreakA}
+              tiebreakB={tiebreakB}
+              onSave={onSave}
+              onClear={onClear}
+              readOnly={readOnly}
+              clearTitle={S.clearScoreTitle}
+              clearLabel={S.clearScore}
+            />
+          )}
+        </div>
       )}
       {onSetRetirement && !waitingDisabled && (
         <MatchRetirementActions
@@ -149,8 +156,8 @@ function Bo1ScoreForm({
   useEffect(() => {
     setBigA(scoreA !== null ? String(scoreA) : '');
     setBigB(scoreB !== null ? String(scoreB) : '');
-    setSmallA(tiebreakA > 0 ? String(tiebreakA) : '');
-    setSmallB(tiebreakB > 0 ? String(tiebreakB) : '');
+    setSmallA(String(tiebreakA));
+    setSmallB(String(tiebreakB));
   }, [matchId, scoreA, scoreB, tiebreakA, tiebreakB]);
 
   const persist = (a: string, sa: string, b: string, sb: string) => {
@@ -187,7 +194,7 @@ function Bo1ScoreForm({
 
   return (
     <div
-      className={`score-form-compact${readOnly ? ' score-form-readonly' : ''}`}
+      className={`score-form-score-block score-form-compact${readOnly ? ' score-form-readonly' : ''}`}
     >
       <div className="score-inputs-row">
         <input
@@ -219,7 +226,7 @@ function Bo1ScoreForm({
             setSmallA(v);
             persist(bigA, v, bigB, smallB);
           }}
-          placeholder="·"
+          placeholder="0"
           aria-label={`${labelA} tiebreak`}
         />
         <span className="score-colon score-cell-sep" aria-hidden>
@@ -254,20 +261,17 @@ function Bo1ScoreForm({
             setSmallB(v);
             persist(bigA, smallA, bigB, v);
           }}
-          placeholder="·"
+          placeholder="0"
           aria-label={`${labelB} tiebreak`}
         />
       </div>
-      {!readOnly && scoreA !== null && (
-        <button
-          type="button"
-          className="btn-clear-score score-clear-centered"
+      {!readOnly && (
+        <ScoreRefreshButton
           onClick={() => onClear(matchId)}
           title={clearTitle}
-          aria-label={clearLabel}
-        >
-          ×
-        </button>
+          ariaLabel={clearLabel}
+          disabled={scoreA === null && scoreB === null}
+        />
       )}
     </div>
   );

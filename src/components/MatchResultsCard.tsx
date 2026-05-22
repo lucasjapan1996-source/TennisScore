@@ -1,0 +1,114 @@
+import { useMemo } from 'react';
+import { useTournamentStore } from '../store/useTournamentStore';
+import { CollapsiblePanel } from './CollapsiblePanel';
+import { renderMatchSides } from './PlayerLabel';
+import { useStrings } from '../hooks/useStrings';
+import { knockoutMatchLabel, resolveMatchSides } from '../utils/knockout';
+import { formatSideCompactLabel } from '../utils/player';
+import { formatMatchScore, isMatchPlayed } from '../utils/score';
+import { groupMatchesBySection, withoutThirdPlaceMatches } from '../utils/schedule';
+import { showPlayerGender } from '../utils/tournamentCategory';
+
+export function MatchResultsCard() {
+  const S = useStrings();
+  const { tournament } = useTournamentStore();
+  const genderVisible = showPlayerGender(tournament.category);
+  const compactLabel = (sideIds: string[]) =>
+    formatSideCompactLabel(sideIds, tournament.players, genderVisible);
+
+  const playedMatches = useMemo(() => {
+    const list = withoutThirdPlaceMatches(
+      tournament.matches,
+      tournament.scheduleFormat,
+    ).filter((m) => !m.isBye && isMatchPlayed(m));
+    return [...list].sort((a, b) => a.order - b.order);
+  }, [tournament.matches, tournament.scheduleFormat]);
+
+  const bySection = useMemo(() => {
+    const grouped = groupMatchesBySection(
+      playedMatches,
+      tournament.scheduleFormat,
+    );
+    return [...grouped.entries()].sort((a, b) => {
+      if (a[0] === 'knockout') return 1;
+      if (b[0] === 'knockout') return -1;
+      if (a[0] === 'all') return -1;
+      if (b[0] === 'all') return 1;
+      return Number(a[0].slice(1)) - Number(b[0].slice(1));
+    });
+  }, [playedMatches, tournament.scheduleFormat]);
+
+  if (playedMatches.length === 0) return null;
+
+  const sectionTitle = (key: string) => {
+    if (key === 'knockout') return S.sectionKnockout;
+    if (key === 'all') return S.sectionAllMatches;
+    return S.groupLabel(Number(key.slice(1)));
+  };
+
+  return (
+    <CollapsiblePanel
+      title={S.matchResultsTitle}
+      titleTitle={S.matchResultsTitleHint}
+      compact
+      defaultOpen
+      className="match-results-panel"
+    >
+      {bySection.map(([key, matches]) => (
+        <section key={key} className="match-results-section">
+          {tournament.scheduleFormat !== 'round_robin' && (
+            <h3 className="match-results-section-title">{sectionTitle(key)}</h3>
+          )}
+          <ol className="match-results-list">
+            {matches.map((m) => {
+              const resolved = resolveMatchSides(m, tournament, compactLabel);
+              const stageLabel =
+                m.knockoutStage != null ? knockoutMatchLabel(m) : null;
+              return (
+                <li key={m.id} className="match-results-item">
+                  <div className="match-results-meta">
+                    {tournament.scheduleFormat === 'round_robin' && (
+                      <span className="match-order-badge">#{m.order}</span>
+                    )}
+                    {stageLabel && (
+                      <span className="match-order-badge knockout-stage-badge">
+                        {stageLabel}
+                      </span>
+                    )}
+                  </div>
+                  <div className="match-results-body">
+                    <span className="match-results-sides">
+                      {renderMatchSides(
+                        m.sideAIds,
+                        tournament.players,
+                        tournament.mode,
+                        tournament.teams,
+                        genderVisible,
+                      )}
+                      <span className="match-results-vs">{S.matchupVs}</span>
+                      {renderMatchSides(
+                        m.sideBIds,
+                        tournament.players,
+                        tournament.mode,
+                        tournament.teams,
+                        genderVisible,
+                      )}
+                    </span>
+                    <span className="match-results-score">
+                      {formatMatchScore(m)}
+                    </span>
+                  </div>
+                  {!resolved.ready && resolved.waitingReason && (
+                    <p className="hint match-results-waiting">
+                      {resolved.waitingReason}
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      ))}
+    </CollapsiblePanel>
+  );
+}

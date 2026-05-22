@@ -58,12 +58,18 @@ export function SetupPanel() {
     setGroupCount,
     setTeamPair,
     generateSchedule,
+    appendSchedule,
     setActiveTab,
   } = useTournamentStore();
   const genderVisible = showPlayerGender(tournament.category);
 
   const handleGenerate = () => {
     const err = generateSchedule();
+    setError(err);
+  };
+
+  const handleAppendSchedule = () => {
+    const err = appendSchedule();
     setError(err);
   };
 
@@ -119,7 +125,7 @@ export function SetupPanel() {
   };
 
   return (
-    <>
+    <div className="setup-tab">
       <CollapsiblePanel title={S.mode} titleTitle={S.modeTitle} compact>
         <section className="mode-toggle mode-toggle-2">
           <button
@@ -460,9 +466,11 @@ export function SetupPanel() {
           teams={tournament.teams}
           groups={tournament.groups}
           matches={tournament.matches}
+          scheduleBatchSizes={tournament.scheduleBatchSizes}
+          onAppendSchedule={handleAppendSchedule}
           onGoScore={() => setActiveTab('matches')}
         />
       )}
-    </>
+    </div>
   );
 }

@@ -73,6 +73,27 @@ function isDoublesPartnerRoundRobin(t: StandingTournamentFields): boolean {
   return usesPlayerStandings(t.mode, t);
 }
 
+/** 混合赛同分时：含女球员的一方/球员靠前 */
+function mixedGenderPriority(
+  entityId: string,
+  byPlayer: boolean,
+  players: Player[],
+  teams: Team[],
+): number {
+  let ids: string[];
+  if (byPlayer) {
+    ids = [entityId];
+  } else {
+    const team = teams.find(
+      (t) => t.id === entityId || entityKey(t.playerIds) === entityId,
+    );
+    ids = team ? [...team.playerIds] : entityId.split(',');
+  }
+  return ids.some((id) => players.find((p) => p.id === id)?.gender === 'female')
+    ? 1
+    : 0;
+}
+
 function buildEntities(
   mode: MatchMode,
   players: Player[],
@@ -305,6 +326,8 @@ function finalizeStandingRows(
   stats: Map<string, EntityStats>,
   relevant: Match[],
   tournament: StandingTournamentFields,
+  players: Player[],
+  teams: Team[],
 ): StandingRow[] {
   const byPlayer = usesPlayerStandings(tournament.mode, tournament);
   const rows = [...stats.values()].map((s) => ({
@@ -333,6 +356,11 @@ function finalizeStandingRows(
       if (y.gamesFor !== x.gamesFor) return y.gamesFor - x.gamesFor;
       const h2h = headToHeadWins(relevant, x.id, y.id);
       if (h2h !== 0) return h2h > 0 ? -1 : 1;
+    }
+    if (tournament.category === 'mixed') {
+      const gx = mixedGenderPriority(x.id, byPlayer, players, teams);
+      const gy = mixedGenderPriority(y.id, byPlayer, players, teams);
+      if (gy !== gx) return gy - gx;
     }
     return x.label.localeCompare(y.label, 'zh-CN');
   });
@@ -380,7 +408,7 @@ export function computeGroupAndKnockoutStandings(
   for (const m of relevant) {
     applyMatchToStats(stats, m, tournament);
   }
-  return finalizeStandingRows(stats, relevant, tournament);
+  return finalizeStandingRows(stats, relevant, tournament, players, teams);
 }
 
 export function computeStandings(
@@ -400,7 +428,7 @@ export function computeStandings(
     applyMatchToStats(stats, m, tournament);
   }
 
-  return finalizeStandingRows(stats, relevant, tournament);
+  return finalizeStandingRows(stats, relevant, tournament, players, teams);
 }
 
 export function formatMatchSides(

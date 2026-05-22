@@ -176,6 +176,7 @@ export interface Strings {
   scheduleMatchesUnit: string;
   matrix: string;
   matrixTitle: string;
+  matrixBatchTitle: (batch: number) => string;
   matrixHint: string;
   matrixHintShort: string;
   fullScheduleHintShort: string;
@@ -185,6 +186,8 @@ export interface Strings {
   matchPendingShort: string;
   goScore: string;
   goScoreTitle: string;
+  appendSchedule: string;
+  appendScheduleTitle: string;
   sectionKnockout: string;
   knockoutStage: string;
   knockoutQuarter: string;
@@ -229,6 +232,8 @@ export interface Strings {
   scoreHintTitle: string;
   clearScore: string;
   clearScoreTitle: string;
+  matchResultsTitle: string;
+  matchResultsTitleHint: string;
   noRankTitle: string;
   noRank: string;
   goSetup: string;
@@ -276,6 +281,8 @@ export interface Strings {
   podiumHintRoundRobinShort: string;
   podiumHintKnockoutShort: string;
   errMinPlayers: string;
+  errAppendNeedsSchedule: string;
+  errAppendNoMatches: string;
   errDoublesEven: string;
   errDoublesPartnerMin: string;
   errMinTeams: string;
