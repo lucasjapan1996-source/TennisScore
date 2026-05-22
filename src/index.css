@@ -8,10 +8,8 @@
   --tab-row-h: 1.92rem;
   --footer-h: 0.7rem;
   --tab-icon-size: 1.18rem;
-  --safe-bottom-chrome: env(safe-area-inset-bottom, 0px);
-  --chrome-bottom-h: calc(
-    var(--footer-h) + var(--tab-row-h) + var(--safe-bottom-chrome)
-  );
+  /* 底部 Home 指示条：仅在 .app-bottom-chrome 垫一层，避免重复留白 */
+  --safe-bottom-inset: env(safe-area-inset-bottom, 0px);
   --btn-gap: 0.5rem;
   --btn-gap-tight: 0.4rem;
   --btn-min-h: 2.5rem;
@@ -102,8 +100,12 @@ html {
   overflow: hidden;
   width: 100%;
   max-width: 100%;
+  min-height: 100%;
+  min-height: 100dvh;
   height: 100%;
+  height: 100dvh;
   -webkit-text-size-adjust: 100%;
+  background: var(--bg);
 }
 
 body {
@@ -111,9 +113,11 @@ body {
   overflow: hidden;
   width: 100%;
   max-width: 100%;
+  min-height: 100%;
+  min-height: 100dvh;
   height: 100%;
   height: 100dvh;
-  height: 100svh;
+  max-height: 100dvh;
   overscroll-behavior: none;
   background: var(--bg);
 }
@@ -122,9 +126,11 @@ body {
   overflow: hidden;
   width: 100%;
   max-width: 100%;
+  min-height: 100%;
+  min-height: 100dvh;
   height: 100%;
   height: 100dvh;
-  height: 100svh;
+  max-height: 100dvh;
 }
 
 .app-shell {
@@ -133,10 +139,13 @@ body {
   overflow: hidden;
   width: 100%;
   max-width: 560px;
+  min-height: 100%;
+  min-height: 100dvh;
   height: 100%;
   height: 100dvh;
-  height: 100svh;
+  max-height: 100dvh;
   margin: 0 auto;
+  background: var(--bg);
 }
 
 button,
@@ -1438,7 +1447,7 @@ select.gender-select-unspecified {
   width: 100%;
   max-width: 100%;
   background: var(--bg);
-  padding-bottom: 0;
+  padding-bottom: var(--safe-bottom-inset);
   box-shadow: 0 -1px 0 color-mix(in srgb, var(--border) 50%, transparent);
 }
 
@@ -1449,8 +1458,8 @@ select.gender-select-unspecified {
   width: 100%;
   max-width: 100%;
   touch-action: manipulation;
-  padding: 0.22rem calc(0.4rem + var(--safe-right))
-    calc(0.04rem + var(--safe-bottom-chrome)) calc(0.4rem + var(--safe-left));
+  padding: 0.22rem calc(0.4rem + var(--safe-right)) 0.1rem
+    calc(0.4rem + var(--safe-left));
   background: var(--tab-bar-bg);
   border-top: none;
   box-shadow: none;
@@ -2365,72 +2374,32 @@ p.row + p,
   text-align: left;
 }
 
-/* iOS「添加到主屏幕」PWA：贴底、放大 Tab、Home 条仅一层内边距 */
+/* iOS 主屏幕 PWA：全屏 flex 布局，安全区只垫在底栏容器一次 */
 @media (display-mode: standalone) {
   :root {
-    --tab-row-h: 2.55rem;
-    --footer-h: 0.68rem;
-    --tab-icon-size: 1.55rem;
-    --safe-bottom-chrome: max(6px, env(safe-area-inset-bottom, 0px));
-    --chrome-bottom-h: calc(
-      var(--footer-h) + var(--tab-row-h) + var(--safe-bottom-chrome)
-    );
-  }
-
-  html {
-    height: -webkit-fill-available;
-  }
-
-  body,
-  #root {
-    height: 100%;
-    height: -webkit-fill-available;
-    min-height: -webkit-fill-available;
-    max-height: -webkit-fill-available;
-  }
-
-  .app-shell {
-    height: 100%;
-    height: -webkit-fill-available;
-    min-height: -webkit-fill-available;
-    max-height: -webkit-fill-available;
+    --footer-h: 0;
+    --tab-row-h: 2.5rem;
+    --tab-icon-size: 1.5rem;
   }
 
   .app-footer {
-    display: block;
-    padding: 0.04rem calc(0.45rem + var(--safe-right)) 0.03rem
-      calc(0.45rem + var(--safe-left));
-    font-size: 0.42rem;
-    line-height: 1.15;
-  }
-
-  .app-footer p {
-    white-space: normal;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
+    display: none;
   }
 
   .app-bottom-chrome {
-    position: fixed;
-    left: 50%;
-    bottom: 0;
-    z-index: 100;
-    width: min(100%, 560px);
-    transform: translateX(-50%);
-    background: var(--bg);
-    padding-bottom: 0;
+    position: static;
+    transform: none;
+    padding-bottom: var(--safe-bottom-inset);
   }
 
   .tab-bar {
-    padding-top: 0.1rem;
-    padding-bottom: var(--safe-bottom-chrome);
+    padding-top: 0.12rem;
+    padding-bottom: 0.08rem;
   }
 
   .tab-bar button {
-    padding: 0.14rem 0.08rem 0.1rem;
-    gap: 0.12rem;
+    padding: 0.12rem 0.08rem 0.08rem;
+    gap: 0.1rem;
     min-height: var(--tab-row-h);
     justify-content: center;
   }
@@ -2444,33 +2413,25 @@ p.row + p,
   }
 
   .app-main {
-    padding-bottom: var(--chrome-bottom-h);
+    padding-bottom: 0.35rem;
   }
 }
 
-/* iOS 触控：浏览器内收紧；PWA 以 standalone 规则为准 */
+/* iOS Safari 浏览器内（非主屏幕 PWA） */
 @supports (-webkit-touch-callout: none) {
-  @media (max-width: 768px) {
+  @media (max-width: 768px) and (display-mode: browser) {
     :root {
-      --tab-row-h: 1.62rem;
+      --tab-row-h: 1.75rem;
       --tab-icon-size: 1.12rem;
-      --safe-bottom-chrome: env(safe-area-inset-bottom, 0px);
-      --chrome-bottom-h: calc(
-        var(--footer-h) + var(--tab-row-h) + var(--safe-bottom-chrome)
-      );
     }
 
     .tab-bar {
       padding-top: 0.14rem;
-      padding-bottom: var(--safe-bottom-chrome);
+      padding-bottom: 0.08rem;
     }
 
     .tab-bar button {
-      padding: 0 0.06rem 0.08rem;
-    }
-
-    .app-bottom-chrome {
-      padding-bottom: 0;
+      padding: 0.06rem 0.06rem 0.1rem;
     }
   }
 }
