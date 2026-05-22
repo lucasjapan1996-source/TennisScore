@@ -54,7 +54,7 @@ function playerSlotNumber(playerId: string, players: Player[]): number {
   return index >= 0 ? index + 1 : 0;
 }
 
-/** 对阵表单行：单打为签位号，双打为 1&2 形式 */
+/** 对阵表单行：单打为签位号，双打为 1/2 形式 */
 export function formatScheduleSideLabel(
   sideIds: string[],
   players: Player[],
@@ -69,10 +69,10 @@ export function formatScheduleSideLabel(
     .map((id) => playerSlotNumber(id, players))
     .filter((n) => n > 0)
     .sort((a, b) => a - b);
-  return nums.length > 0 ? nums.join('&') : '?';
+  return nums.length > 0 ? nums.join('/') : '?';
 }
 
-/** 对阵表一行：如 1&2vs3&4 或 1vs2 */
+/** 对阵表一行：如 1/2 vs 3/4 或 1 vs 2 */
 export function formatScheduleMatchLine(
   sideAIds: string[],
   sideBIds: string[],

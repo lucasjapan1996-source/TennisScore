@@ -28,6 +28,7 @@ import {
   interleaveRoundRobinRounds,
   orderByRestAndFairness,
 } from './matchOrder';
+import { scheduleSinglesTimeline } from './singlesScheduler';
 
 function uid(): string {
   return crypto.randomUUID();
@@ -264,10 +265,19 @@ export function buildGroupStageSchedule(
           buildCircleRoundRobinRounds(orderEntities(members, seedMode)),
         );
       }
-      const matchOrder = orderByRestAndFairness(
-        interleaveRoundRobinRounds(roundsPerGroup),
-        ([a, b]) => [a.id, b.id],
-      );
+      const flat = interleaveRoundRobinRounds(roundsPerGroup) as [
+        Player,
+        Player,
+      ][];
+      const allIds = [...new Set(flat.flatMap(([a, b]) => [a.id, b.id]))];
+      const matchOrder = scheduleSinglesTimeline(
+        flat.map(([a, b]) => [a.id, b.id] as const),
+        allIds,
+        seedMode,
+      ).map(([aId, bId]) => {
+        const byId = new Map(players.map((p) => [p.id, p]));
+        return [byId.get(aId)!, byId.get(bId)!] as [Player, Player];
+      });
       for (const [a, b] of matchOrder) {
         const groupId =
           groups.find(

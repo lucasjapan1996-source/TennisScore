@@ -1,8 +1,9 @@
 /**
- * 对阵顺序：圈赛分轮、按签位顺序分块、休息均衡排程。
+ * 对阵顺序：圈赛分轮、按签位顺序分块；单打排程见 singlesScheduler。
  */
 
 import type { ScheduleSeedMode } from '../types';
+import { buildSinglesRoundRobinSchedule } from './singlesScheduler';
 
 export function pairingKey<T>(a: T, b: T, idOf: (e: T) => string): string {
   const x = idOf(a);
@@ -32,22 +33,16 @@ export function buildSequentialAdjacentTeamRounds<T>(
   return rounds;
 }
 
-/** 按顺序：先相邻分块对阵，再排其余圈赛对局 */
+/** 单打循环赛顺序：加权软约束（公平、休息、顺序亲和） */
 export function buildMatchOrderWithSequentialFirst<T>(
   ordered: readonly T[],
   idOf: (e: T) => string,
   seedMode: ScheduleSeedMode,
 ): [T, T][] {
-  const full = flattenRoundRobinRounds(buildCircleRoundRobinRounds(ordered));
-  if (seedMode !== 'sequential') {
-    return orderByRestAndFairness(full, ([a, b]) => [idOf(a), idOf(b)]);
-  }
-
-  const firstWave = buildSequentialAdjacentSinglesWave(ordered);
-  const used = new Set(firstWave.map(([a, b]) => pairingKey(a, b, idOf)));
-  const rest = full.filter(([a, b]) => !used.has(pairingKey(a, b, idOf)));
-  const restOrdered = orderByRestAndFairness(rest, ([a, b]) => [idOf(a), idOf(b)]);
-  return [...firstWave, ...restOrdered];
+  const ids = ordered.map(idOf);
+  const scheduled = buildSinglesRoundRobinSchedule(ids, seedMode);
+  const byId = new Map(ordered.map((e) => [idOf(e), e]));
+  return scheduled.map(([a, b]) => [byId.get(a)!, byId.get(b)!]);
 }
 
 /** 按顺序：双打固定队 — 先 12vs34、56vs78，再排其余队际对局 */
@@ -176,28 +171,40 @@ export function orderByRestAndFairness<T>(
   const playCount = new Map<string, number>();
 
   const score = (ids: readonly string[], slot: number): number => {
-    let conflict = 0;
     let minGap = Number.POSITIVE_INFINITY;
     let maxGap = 0;
-    let fairness = 0;
+    let matchCountSum = 0;
+    let backToBack = 0;
+    let shortRest = 0;
 
     for (const id of ids) {
       const played = playCount.get(id) ?? 0;
-      fairness += played;
+      matchCountSum += played;
       const prev = lastSlot.get(id);
       if (prev === undefined) {
-        minGap = Math.min(minGap, slot + 2);
-        maxGap = Math.max(maxGap, slot + 2);
+        minGap = Math.min(minGap, slot + 3);
+        maxGap = Math.max(maxGap, slot + 3);
       } else {
         const gap = slot - prev;
-        if (gap <= 1) conflict++;
+        if (gap <= 1) backToBack++;
+        else if (gap === 2) shortRest++;
         minGap = Math.min(minGap, gap);
         maxGap = Math.max(maxGap, gap);
       }
     }
 
-    if (conflict > 0) return -10_000 + conflict;
-    return minGap * 5 + maxGap * 1.5 - fairness * 0.25;
+    if (!Number.isFinite(minGap)) {
+      minGap = slot + 3;
+      maxGap = slot + 3;
+    }
+
+    return (
+      minGap * 5 +
+      maxGap * 1.2 -
+      matchCountSum * 0.35 -
+      backToBack * 75 -
+      shortRest * 15
+    );
   };
 
   let slot = 0;

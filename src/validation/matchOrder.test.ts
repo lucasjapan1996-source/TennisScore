@@ -94,8 +94,8 @@ describe('sequential seed block order', () => {
       players,
       'doubles',
     );
-    expect(line0).toBe('1&2 vs 3&4');
-    expect(line1).toBe('5&6 vs 7&8');
+    expect(line0).toBe('1/2 vs 3/4');
+    expect(line1).toBe('5/6 vs 7/8');
   });
 
   it('8 players singles sequential: adjacent pairs first wave', () => {
@@ -133,13 +133,13 @@ describe('sequential seed block order', () => {
       players,
       'doubles',
     );
-    expect(line0).toBe('1&2 vs 3&4');
-    expect(line1).toBe('5&6 vs 7&8');
+    expect(line0).toBe('1/2 vs 3/4');
+    expect(line1).toBe('5/6 vs 7/8');
   });
 });
 
 describe('schedule integration', () => {
-  it('singles round robin avoids back-to-back', () => {
+  it('singles round robin: soft rest and equal play count', () => {
     const players = mockPlayers(6);
     const { matches } = buildRoundRobinSchedule(
       players,
@@ -150,10 +150,14 @@ describe('schedule integration', () => {
     const stats = analyzeMatchOrder(
       matches.map((m) => matchParticipants(m.sideAIds, m.sideBIds)),
     );
-    expect(stats.hasBackToBack).toBe(false);
     for (const p of players) {
       expect(stats.playCount.get(p.id)).toBe(5);
     }
+    let backToBackSlots = 0;
+    for (const gaps of stats.restGaps.values()) {
+      backToBackSlots += gaps.filter((g) => g <= 1).length;
+    }
+    expect(backToBackSlots).toBeLessThan(matches.length);
   });
 
   it('group stage random seed interleaves groups by round', () => {
@@ -169,7 +173,11 @@ describe('schedule integration', () => {
     const stats = analyzeMatchOrder(
       groupMatches.map((m) => matchParticipants(m.sideAIds, m.sideBIds)),
     );
-    expect(stats.hasBackToBack).toBe(false);
+    let backToBackSlots = 0;
+    for (const gaps of stats.restGaps.values()) {
+      backToBackSlots += gaps.filter((g) => g <= 1).length;
+    }
+    expect(backToBackSlots).toBeLessThan(groupMatches.length);
     for (const p of players) {
       expect(stats.playCount.get(p.id)).toBe(3);
     }

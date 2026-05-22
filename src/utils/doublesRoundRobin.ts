@@ -1,4 +1,5 @@
 import type { Match, ScheduleSeedMode } from '../types';
+import { buildRotatingDoublesSchedule } from './doublesScheduler';
 import { orderByRestAndFairness } from './matchOrder';
 
 export type DoublesSide = readonly [string, string];
@@ -108,7 +109,7 @@ export function orderDoublesMatchesNoBackToBack(
   return orderByRestAndFairness(matches, (m) => [...m.sideA, ...m.sideB]);
 }
 
-/** 按签位顺序：每 4 人一场 12&2 vs 3&4，下一波 5&6 vs 7&8 */
+/** 按签位顺序：每 4 人一场 1/2 vs 3/4，下一波 5/6 vs 7/8 */
 export function buildSequentialDoublesBlockMatchups(
   playerIds: readonly string[],
 ): DoublesMatchup[] {
@@ -159,11 +160,7 @@ export function buildDoublesPartnerRoundRobinMatches(
   startOrder = 1,
   seedMode: ScheduleSeedMode = 'random',
 ): Match[] {
-  const selected = selectPartnerRoundMatches(playerIds);
-  const matchOrder =
-    seedMode === 'sequential'
-      ? orderDoublesMatchesSequentialFirst(selected, playerIds)
-      : orderDoublesMatchesNoBackToBack(selected);
+  const matchOrder = buildRotatingDoublesSchedule(playerIds, seedMode);
   return matchOrder.map((m, idx) =>
     createMatch(startOrder + idx, [...m.sideA], [...m.sideB]),
   );

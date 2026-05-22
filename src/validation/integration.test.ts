@@ -135,7 +135,7 @@ describe('schedule formats (simulated)', () => {
     );
     expect(initial.length).toBe(3);
     expect(formatScheduleMatchLine(initial[0].sideAIds, initial[0].sideBIds, p4, 'doubles')).toMatch(
-      /^\d+&\d+ vs \d+&\d+$/,
+      /^\d+\/\d+ vs \d+\/\d+$/,
     );
     const { matches, appendedCount } = appendScheduleMatches(
       initial,
