@@ -199,6 +199,7 @@ export interface Strings {
   knockoutSemi: string;
   knockoutThirdLegacy: string;
   knockoutFinal: string;
+  knockoutRoundLabel: (round: number) => string;
   knockoutSlotGroupRank: (group: number, rank: number) => string;
   knockoutSlotWinner: string;
   knockoutSlotLoser: string;
@@ -208,6 +209,7 @@ export interface Strings {
   knockoutBracketHint: string;
   knockoutBye: string;
   knockoutByeShort: string;
+  knockoutPlayerBye: (player: string) => string;
   knockoutCross: string;
   knockoutCrossRank: (rank: number) => string;
   knockoutRankMatch: (rank: number, stage: string) => string;

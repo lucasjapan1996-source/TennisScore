@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useTournamentStore } from '../store/useTournamentStore';
 import {
+  computeGroupStageFinalStandings,
   computeGroupAndKnockoutStandings,
   computeStandings,
 } from '../utils/ranking';
@@ -46,9 +47,24 @@ export function RankingPanel() {
 
   const podium = useMemo(() => computePodium(tournament), [tournament]);
 
-  const combinedStandings = useMemo(
+  const groupStageFinalStandings = useMemo(
     () =>
-      isGroupStage || isKnockoutOnly
+      isGroupStage
+        ? computeGroupStageFinalStandings(
+            tournament.mode,
+            tournament.players,
+            tournament.teams,
+            tournament.groups,
+            activeMatches,
+            tournament,
+          )
+        : [],
+    [isGroupStage, tournament, activeMatches],
+  );
+
+  const knockoutOnlyStandings = useMemo(
+    () =>
+      isKnockoutOnly
         ? computeGroupAndKnockoutStandings(
             tournament.mode,
             tournament.players,
@@ -57,12 +73,7 @@ export function RankingPanel() {
             tournament,
           )
         : [],
-    [
-      isGroupStage,
-      isKnockoutOnly,
-      tournament,
-      activeMatches,
-    ],
+    [isKnockoutOnly, tournament, activeMatches],
   );
 
   const roundRobinStandings = useMemo(
@@ -79,9 +90,10 @@ export function RankingPanel() {
     [isGroupStage, isKnockoutOnly, tournament, activeMatches],
   );
 
-  const standings =
-    isGroupStage || isKnockoutOnly
-      ? combinedStandings
+  const standings = isGroupStage
+    ? groupStageFinalStandings
+    : isKnockoutOnly
+      ? knockoutOnlyStandings
       : roundRobinStandings;
 
   if (activeMatches.length === 0) {
@@ -120,14 +132,15 @@ export function RankingPanel() {
             players={tournament.players}
             teams={tournament.teams}
             mode={tournament.mode}
-            showGender={genderVisible}
           />
         </CollapsiblePanel>
       )}
 
       <CollapsiblePanel
         title={rankingTitle}
-        titleTitle={S.rankingTitle}
+        titleTitle={
+          isGroupStage ? S.rankingGroupStageHint : S.rankingTitle
+        }
         compact
         defaultOpen
         className="ranking-panel-main"
@@ -199,9 +212,11 @@ function StandingsTable({
             <th title={rankByPlayer ? S.colPlayer : S.colTeam}>
               {rankByPlayer ? S.colPlayer : S.colTeam}
             </th>
-            <th className="num" title={S.colDiff}>
-              {S.colDiff}
-            </th>
+            {scheduleFormat !== 'group_stage' && (
+              <th className="num" title={S.colDiff}>
+                {S.colDiff}
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -209,7 +224,13 @@ function StandingsTable({
             <tr
               key={row.id}
               className={row.rank === 1 ? 'top1' : ''}
-              title={S.standingRowTitle(row.rank, row.gameDiff)}
+              title={
+                scheduleFormat === 'group_stage'
+                  ? row.rank === 1
+                    ? S.champion
+                    : S.rankN(row.rank)
+                  : S.standingRowTitle(row.rank, row.gameDiff)
+              }
             >
               <td className="num">
                 <span
@@ -225,10 +246,12 @@ function StandingsTable({
                   doublesPairing,
                 })}
               </td>
-              <td className="num diff-cell">
-                {row.gameDiff > 0 ? '+' : ''}
-                {row.gameDiff}
-              </td>
+              {scheduleFormat !== 'group_stage' && (
+                <td className="num diff-cell">
+                  {row.gameDiff > 0 ? '+' : ''}
+                  {row.gameDiff}
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

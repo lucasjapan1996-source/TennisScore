@@ -1,7 +1,45 @@
+import { Fragment, type ReactNode } from 'react';
 import type { MatchMode, Player, Team } from '../types';
 import type { PodiumPlace } from '../utils/podium';
+import { getActiveStrings } from '../i18n';
 import { useStrings } from '../hooks/useStrings';
-import { renderMatchSides } from './PlayerLabel';
+
+function entityKey(ids: string[]): string {
+  return [...ids].sort().join(',');
+}
+
+/** 颁奖台：仅显示姓名，不含等级与性别 */
+function renderPodiumNames(
+  sideIds: string[],
+  players: Player[],
+  mode: MatchMode,
+  teams: Team[] = [],
+): ReactNode {
+  const S = getActiveStrings();
+  if (sideIds.length === 0) return S.unknown;
+
+  if (mode === 'singles') {
+    return players.find((pl) => pl.id === sideIds[0])?.name ?? S.unknown;
+  }
+
+  const team = teams.find(
+    (t) =>
+      t.id === sideIds[0] ||
+      entityKey(t.playerIds) === entityKey(sideIds) ||
+      t.playerIds.every((pid) => sideIds.includes(pid)),
+  );
+  const ids = team ? [...team.playerIds] : sideIds;
+
+  return ids.map((pid, i) => {
+    const p = players.find((pl) => pl.id === pid);
+    return (
+      <Fragment key={pid}>
+        {i > 0 && ' / '}
+        {p?.name ?? S.unknown}
+      </Fragment>
+    );
+  });
+}
 
 const PODIUM_ORDER: (1 | 2)[] = [2, 1];
 
@@ -35,13 +73,11 @@ export function PodiumDisplay({
   players,
   teams,
   mode,
-  showGender = true,
 }: {
   places: PodiumPlace[];
   players: Player[];
   teams: Team[];
   mode: MatchMode;
-  showGender?: boolean;
 }) {
   const S = useStrings();
   const placeMeta = {
@@ -67,12 +103,11 @@ export function PodiumDisplay({
                 <div className="podium-name-slot">
                   {ready && entry?.sideIds ? (
                     <span className="podium-name">
-                      {renderMatchSides(
+                      {renderPodiumNames(
                         entry.sideIds,
                         players,
                         mode,
                         teams,
-                        showGender,
                       )}
                     </span>
                   ) : (

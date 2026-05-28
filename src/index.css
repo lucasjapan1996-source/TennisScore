@@ -1855,6 +1855,7 @@ p.row + p,
 }
 
 .schedule-match-no {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1867,8 +1868,25 @@ p.row + p,
   color: var(--muted);
 }
 
+.schedule-match-stage {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.5rem;
+  padding: 0.18rem 0.42rem;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--gold) 14%, var(--surface));
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: color-mix(in srgb, var(--gold) 88%, var(--text));
+  white-space: nowrap;
+  letter-spacing: 0;
+}
+
 .schedule-match-line {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1891,12 +1909,18 @@ p.row + p,
   font-weight: 600;
 }
 
-.schedule-match-bye {
-  flex-shrink: 0;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--muted);
-  white-space: nowrap;
+.schedule-match-row--bye {
+  background: color-mix(in srgb, var(--scored-bg) 65%, transparent);
+}
+
+.schedule-match-row--bye.done {
+  background: var(--scored-bg);
+}
+
+.schedule-match-line--bye {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text);
 }
 
 .schedule-status-switch {
@@ -1959,6 +1983,7 @@ p.row + p,
 }
 
 .schedule-status-switch-text {
+  flex: 0 0 auto;
   font-size: 0.78rem;
   font-weight: 600;
   color: var(--muted);
@@ -2081,23 +2106,13 @@ p.row + p,
   opacity: 0.9;
 }
 
-.bye-card .knockout-waiting {
-  text-align: left;
-}
-
 .bye-card-text {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-.bye-card-text .bye-winner {
+  margin: 0;
+  padding: 0.35rem 0;
+  text-align: center;
   font-weight: 600;
-}
-
-.bye-card-text .bye-status {
-  font-size: 0.85rem;
-  color: var(--muted);
+  line-height: 1.4;
+  word-break: break-word;
 }
 
 .knockout-stage-badge {
@@ -2219,9 +2234,22 @@ p.row + p,
 
 .podium-name {
   display: inline-block;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+}
+
+.podium-1 .podium-name {
+  font-size: 1.22rem;
+  color: color-mix(in srgb, var(--gold) 92%, #8a6914);
+  text-shadow: 0 1px 0 color-mix(in srgb, var(--gold) 35%, transparent);
+}
+
+.podium-2 .podium-name {
+  font-size: 1.08rem;
+  color: color-mix(in srgb, #9aa8b8 88%, var(--text));
+  text-shadow: 0 1px 0 color-mix(in srgb, #b8c5d4 40%, transparent);
 }
 
 .podium-icon {

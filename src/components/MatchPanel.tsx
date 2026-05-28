@@ -2,8 +2,13 @@ import { useMemo, useState } from 'react';
 import { useTournamentStore } from '../store/useTournamentStore';
 import { formatSideCompactLabel } from '../utils/player';
 import { showPlayerGender } from '../utils/tournamentCategory';
-import { renderSideCompactLabel } from './PlayerSideLabel';
-import { knockoutMatchLabel, resolveMatchSides } from '../utils/knockout';
+import { SideCompactLabel } from './PlayerSideLabel';
+import {
+  groupKnockoutMatchesByRound,
+  knockoutMatchLabel,
+  knockoutRoundSectionTitle,
+  resolveMatchSides,
+} from '../utils/knockout';
 import { groupMatchesBySection, withoutThirdPlaceMatches } from '../utils/schedule';
 import { ScoreForm } from './ScoreForm';
 import { isMatchPlayed } from '../utils/score';
@@ -83,6 +88,11 @@ export function MatchPanel() {
   const knockoutDone = activeMatches.filter(
     (m) => m.phase === 'knockout' && isMatchPlayed(m),
   ).length;
+
+  const knockoutRoundGroups = useMemo(() => {
+    if (!isKnockoutOnly) return [];
+    return groupKnockoutMatchesByRound(activeMatches);
+  }, [activeMatches, isKnockoutOnly]);
 
   if (activeMatches.length === 0) {
     return (
@@ -194,10 +204,145 @@ export function MatchPanel() {
         </div>
       </CollapsiblePanel>
 
-      {filteredSections.every(([, ms]) => ms.filter(filterMatch).length === 0) ? (
+      {(isKnockoutOnly
+        ? knockoutRoundGroups.every(({ matches: ms }) =>
+            ms.filter(filterMatch).length === 0,
+          )
+        : filteredSections.every(([, ms]) => ms.filter(filterMatch).length === 0)) ? (
         <section className="panel">
           <p className="empty-state">{S.noMatchesInFilter}</p>
         </section>
+      ) : isKnockoutOnly ? (
+        knockoutRoundGroups.map(({ round, matches: roundMatches }, index) => {
+          const shown = roundMatches.filter(filterMatch);
+          if (shown.length === 0) return null;
+
+          const sectionDone = roundMatches.filter((m) => isMatchPlayed(m)).length;
+          const sample = shown[0]!;
+          const roundTitle = `${knockoutRoundSectionTitle(round, sample)} · ${S.sectionProgress(
+            sectionDone,
+            roundMatches.length,
+          )}`;
+
+          return (
+            <CollapsiblePanel
+              key={`ko-round-${round}`}
+              className="match-round-panel"
+              title={roundTitle}
+              defaultOpen={index === 0}
+            >
+              {shown.map((m) => {
+                const resolved = resolveMatchSides(m, tournament, compactLabel);
+                const labelA =
+                  resolved.ready && m.sideAIds.length > 0 ? (
+                    <SideCompactLabel
+                      sideIds={m.sideAIds}
+                      players={tournament.players}
+                      showGender={genderVisible}
+                    />
+                  ) : (
+                    resolved.labelA
+                  );
+                const labelB =
+                  resolved.ready && m.sideBIds.length > 0 ? (
+                    <SideCompactLabel
+                      sideIds={m.sideBIds}
+                      players={tournament.players}
+                      showGender={genderVisible}
+                    />
+                  ) : (
+                    resolved.labelB
+                  );
+                const textLabelA =
+                  m.sideAIds.length > 0
+                    ? compactLabel(m.sideAIds, tournament.players)
+                    : typeof resolved.labelA === 'string'
+                      ? resolved.labelA
+                      : '?';
+                const textLabelB =
+                  m.sideBIds.length > 0
+                    ? compactLabel(m.sideBIds, tournament.players)
+                    : typeof resolved.labelB === 'string'
+                      ? resolved.labelB
+                      : '?';
+
+                if (m.isBye) {
+                  return (
+                    <article
+                      key={m.id}
+                      className="match-card match-card-compact done bye-card"
+                    >
+                      <div className="match-card-meta">
+                        <span className="match-order-badge knockout-stage-badge">
+                          {knockoutMatchLabel(m)}
+                        </span>
+                      </div>
+                      <p className="hint bye-card-text">
+                        {S.knockoutPlayerBye(textLabelA)}
+                      </p>
+                    </article>
+                  );
+                }
+
+                const matchBestOf = resolveMatchBestOf(m, tournament);
+
+                const showMeta =
+                  (!isGroupStage && !isKnockoutOnly) ||
+                  (m.phase === 'knockout' && !!m.knockoutStage) ||
+                  tournament.bestOfMode === 'custom';
+
+                return (
+                  <article
+                    key={m.id}
+                    className={`match-card match-card-compact${isMatchPlayed(m) ? ' done' : ''}`}
+                  >
+                    {showMeta && (
+                      <div className="match-card-meta">
+                        {!isGroupStage && !isKnockoutOnly && (
+                          <span className="match-order-badge">#{m.order}</span>
+                        )}
+                        {m.phase === 'knockout' && m.knockoutStage && (
+                          <span className="match-order-badge knockout-stage-badge">
+                            {knockoutMatchLabel(m)}
+                          </span>
+                        )}
+                        {tournament.bestOfMode === 'custom' && (
+                          <span
+                            className="match-order-badge match-bo-badge"
+                            title={S.scoreBestOfHint(matchBestOf)}
+                          >
+                            {S.matchBestOfBadge(matchBestOf)}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    <ScoreForm
+                      key={m.id}
+                      matchId={m.id}
+                      labelA={labelA}
+                      labelB={labelB}
+                      textLabelA={textLabelA}
+                      textLabelB={textLabelB}
+                      scoreA={m.scoreA}
+                      scoreB={m.scoreB}
+                      tiebreakA={m.tiebreakA}
+                      tiebreakB={m.tiebreakB}
+                      sets={m.sets ?? []}
+                      retiredSide={m.retiredSide}
+                      bestOf={matchBestOf}
+                      onSave={updateMatchScore}
+                      onSaveSets={updateMatchSets}
+                      onSetRetirement={setMatchRetirement}
+                      onClear={clearMatchScore}
+                      disabled={!resolved.ready}
+                      disabledHint={resolved.waitingReason ?? undefined}
+                    />
+                  </article>
+                );
+              })}
+            </CollapsiblePanel>
+          );
+        })
       ) : (
         filteredSections.map(([key, sectionMatches]) => {
           const shown = sectionMatches.filter(filterMatch);
@@ -220,29 +365,37 @@ export function MatchPanel() {
               {shown.map((m) => {
                 const resolved = resolveMatchSides(m, tournament, compactLabel);
                 const labelA =
-                  resolved.ready && m.sideAIds.length > 0
-                    ? renderSideCompactLabel(
-                        m.sideAIds,
-                        tournament.players,
-                        genderVisible,
-                      )
-                    : resolved.labelA;
+                  resolved.ready && m.sideAIds.length > 0 ? (
+                    <SideCompactLabel
+                      sideIds={m.sideAIds}
+                      players={tournament.players}
+                      showGender={genderVisible}
+                    />
+                  ) : (
+                    resolved.labelA
+                  );
                 const labelB =
-                  resolved.ready && m.sideBIds.length > 0
-                    ? renderSideCompactLabel(
-                        m.sideBIds,
-                        tournament.players,
-                        genderVisible,
-                      )
-                    : resolved.labelB;
+                  resolved.ready && m.sideBIds.length > 0 ? (
+                    <SideCompactLabel
+                      sideIds={m.sideBIds}
+                      players={tournament.players}
+                      showGender={genderVisible}
+                    />
+                  ) : (
+                    resolved.labelB
+                  );
                 const textLabelA =
                   m.sideAIds.length > 0
                     ? compactLabel(m.sideAIds, tournament.players)
-                    : String(resolved.labelA);
+                    : typeof resolved.labelA === 'string'
+                      ? resolved.labelA
+                      : '?';
                 const textLabelB =
                   m.sideBIds.length > 0
                     ? compactLabel(m.sideBIds, tournament.players)
-                    : String(resolved.labelB);
+                    : typeof resolved.labelB === 'string'
+                      ? resolved.labelB
+                      : '?';
 
                 if (m.isBye) {
                   return (
@@ -255,9 +408,8 @@ export function MatchPanel() {
                           {knockoutMatchLabel(m)}
                         </span>
                       </div>
-                      <p className="hint knockout-waiting bye-card-text">
-                        <span className="bye-winner">{labelA}</span>
-                        <span className="bye-status">{S.knockoutByeShort}</span>
+                      <p className="hint bye-card-text">
+                        {S.knockoutPlayerBye(textLabelA)}
                       </p>
                     </article>
                   );

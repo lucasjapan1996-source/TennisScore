@@ -261,6 +261,7 @@ describe('best of / round robin', () => {
       retiredSide: null,
       playedAt: null,
       knockoutStage: null,
+      knockoutRound: null,
       knockoutRank: null,
       slotA: null,
       slotB: null,
@@ -293,13 +294,19 @@ describe('best of / round robin', () => {
       retiredSide: null,
       playedAt: null,
       knockoutStage: 'semi',
+      knockoutRound: 2,
       knockoutRank: 1,
       slotA: null,
       slotB: null,
       isBye: false,
       scheduleMarkedDone: false,
     };
-    const final: Match = { ...semi, id: 'f', knockoutStage: 'final' };
+    const final: Match = {
+      ...semi,
+      id: 'f',
+      knockoutStage: 'final',
+      knockoutRound: 3,
+    };
     expect(resolveMatchBestOf(semi, t)).toBe(3);
     expect(resolveMatchBestOf(final, t)).toBe(5);
   });

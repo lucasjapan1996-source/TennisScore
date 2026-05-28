@@ -18,6 +18,7 @@ function match(a: string, b: string, scoreA: number, scoreB: number): Match {
     phase: 'group',
     group: null,
     knockoutStage: null,
+    knockoutRound: null,
     knockoutRank: null,
     slotA: null,
     slotB: null,

@@ -3,12 +3,16 @@ import type { Player } from '../types';
 import { useStrings } from '../hooks/useStrings';
 import { GenderSymbol } from './GenderSymbol';
 
-/** 比分卡片用：姓名 + 带颜色的性别图标 */
-export function renderSideCompactLabel(
-  sideIds: string[],
-  players: Player[],
+/** 比分卡片用：姓名 + 带颜色的性别图标（独立组件，避免在父级 render 中条件调用 hooks） */
+export function SideCompactLabel({
+  sideIds,
+  players,
   showGender = true,
-): ReactNode {
+}: {
+  sideIds: string[];
+  players: Player[];
+  showGender?: boolean;
+}) {
   const S = useStrings();
   return (
     <>
@@ -35,5 +39,20 @@ export function renderSideCompactLabel(
         );
       })}
     </>
+  );
+}
+
+/** @deprecated 请使用 `<SideCompactLabel />` */
+export function renderSideCompactLabel(
+  sideIds: string[],
+  players: Player[],
+  showGender = true,
+): ReactNode {
+  return (
+    <SideCompactLabel
+      sideIds={sideIds}
+      players={players}
+      showGender={showGender}
+    />
   );
 }

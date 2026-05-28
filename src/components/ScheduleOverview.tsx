@@ -21,7 +21,11 @@ import {
 } from '../utils/schedule';
 import { formatScheduleMatchLine, formatSideCompactLabel } from '../utils/player';
 import { showPlayerGender } from '../utils/tournamentCategory';
-import { knockoutMatchLabel, resolveMatchSides } from '../utils/knockout';
+import {
+  formatKnockoutByeLine,
+  knockoutMatchLabel,
+  resolveMatchSides,
+} from '../utils/knockout';
 import { formatMatchScoreForRow } from '../utils/score';
 import { getActiveStrings } from '../i18n';
 import { useStrings } from '../hooks/useStrings';
@@ -227,15 +231,19 @@ export function ScheduleOverview({
               {sectionMatches.map((m) => {
                 const resolved = resolveMatchSides(m, resolveCtx, compactLabel);
                 const canFormatLine =
-                  m.sideAIds.length > 0 && m.sideBIds.length > 0;
-                const matchupLine = canFormatLine
-                  ? formatScheduleMatchLine(
-                      m.sideAIds,
-                      m.sideBIds,
-                      players,
-                      mode,
-                    )
-                  : `${resolved.labelA} vs ${resolved.labelB}`;
+                  !m.isBye &&
+                  m.sideAIds.length > 0 &&
+                  m.sideBIds.length > 0;
+                const matchupLine = m.isBye
+                  ? formatKnockoutByeLine(resolved.labelA)
+                  : canFormatLine
+                    ? formatScheduleMatchLine(
+                        m.sideAIds,
+                        m.sideBIds,
+                        players,
+                        mode,
+                      )
+                    : `${resolved.labelA} vs ${resolved.labelB}`;
                 const markedDone = isMatchScheduleMarkedDone(m);
                 const canToggle =
                   !m.isBye &&
@@ -248,17 +256,25 @@ export function ScheduleOverview({
                 return (
                   <li
                     key={m.id}
-                    className={`schedule-match-row${markedDone ? ' done' : ''}`}
+                    className={`schedule-match-row${m.isBye ? ' schedule-match-row--bye' : ''}${markedDone ? ' done' : ''}`}
                   >
-                    <span className="schedule-match-no" title={S.matchNoTitle(m.order)}>
+                    <span
+                      className={
+                        stageLabel ? 'schedule-match-stage' : 'schedule-match-no'
+                      }
+                      title={
+                        stageLabel ? stageLabel : S.matchNoTitle(m.order)
+                      }
+                    >
                       {stageLabel ?? m.order}
                     </span>
-                    <span className="schedule-match-line" title={matchupLine}>
+                    <span
+                      className={`schedule-match-line${m.isBye ? ' schedule-match-line--bye' : ''}`}
+                      title={matchupLine}
+                    >
                       {matchupLine}
                     </span>
-                    {m.isBye ? (
-                      <span className="schedule-match-bye">{S.knockoutByeShort}</span>
-                    ) : (
+                    {!m.isBye && (
                       <ScheduleMatchStatusSwitch
                         played={markedDone}
                         disabled={!canToggle}

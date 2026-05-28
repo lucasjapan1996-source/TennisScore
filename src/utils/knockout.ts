@@ -54,6 +54,42 @@ export function knockoutStageLabel(stage: KnockoutStage): string {
   }
 }
 
+/** 淘汰赛按轮次分组（纯淘汰赛 UI 用） */
+export function groupKnockoutMatchesByRound(
+  matches: readonly Match[],
+): { round: number; matches: Match[] }[] {
+  const map = new Map<number, Match[]>();
+  for (const m of matches) {
+    if (m.phase !== 'knockout') continue;
+    const round = m.knockoutRound ?? 0;
+    const list = map.get(round) ?? [];
+    list.push(m);
+    map.set(round, list);
+  }
+  return [...map.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([round, list]) => ({
+      round,
+      matches: [...list].sort((a, b) => a.order - b.order),
+    }));
+}
+
+export function knockoutRoundSectionTitle(
+  round: number,
+  sample: Match,
+): string {
+  const S = getActiveStrings();
+  if (sample.knockoutStage === 'final') return S.knockoutFinal;
+  if (sample.knockoutStage === 'semi' || sample.isBye) {
+    return S.knockoutSemi;
+  }
+  return S.knockoutRoundLabel(round);
+}
+
+export function formatKnockoutByeLine(winnerLabel: string): string {
+  return getActiveStrings().knockoutPlayerBye(winnerLabel);
+}
+
 export function knockoutMatchLabel(m: Match): string {
   if (m.isBye) return getActiveStrings().knockoutBye;
   const tier = m.knockoutRank ?? 1;
@@ -209,19 +245,25 @@ export function resolveMatchSides(
 
   if (m.isBye) {
     const winnerIds =
-      m.sideAIds.length > 0 ? m.sideAIds : m.sideBIds.length > 0 ? m.sideBIds : null;
-    const winnerLabel = winnerIds
-      ? formatLabel(winnerIds, tournament.players)
-      : m.slotA
-        ? slotLabel(m.slotA)
-        : m.slotB
-          ? slotLabel(m.slotB)
-          : '?';
+      resolveByeWinnerIds(m, tournament) ??
+      (m.sideAIds.length > 0
+        ? m.sideAIds
+        : m.sideBIds.length > 0
+          ? m.sideBIds
+          : []);
+    const winnerLabel =
+      winnerIds.length > 0
+        ? formatLabel(winnerIds, tournament.players)
+        : m.slotA
+          ? slotLabel(m.slotA)
+          : m.slotB
+            ? slotLabel(m.slotB)
+            : '?';
     return {
-      sideAIds: winnerIds ?? [],
+      sideAIds: winnerIds,
       sideBIds: [],
       labelA: winnerLabel,
-      labelB: getActiveStrings().knockoutByeShort,
+      labelB: '',
       ready: true,
       waitingReason: null,
     };
@@ -278,10 +320,17 @@ export function nextPowerOfTwo(n: number): number {
   return p;
 }
 
-/** 单档淘汰赛签表场次数（含轮空，网球仅决冠亚军无季军赛） */
-export function countBracketMatches(entrantCount: number): number {
+/** 淘汰赛签位规模：仅奇数人数扩至 2 的幂（首轮轮空），偶数不补位 */
+export function initialKnockoutBracketSize(entrantCount: number): number {
   if (entrantCount < 2) return 0;
-  const size = nextPowerOfTwo(entrantCount);
+  if (entrantCount % 2 === 1) return nextPowerOfTwo(entrantCount);
+  return entrantCount;
+}
+
+/** 单档淘汰赛签表场次数（含首轮轮空，网球仅决冠亚军无季军赛） */
+export function countBracketMatches(entrantCount: number): number {
+  const size = initialKnockoutBracketSize(entrantCount);
+  if (size < 2) return 0;
   return size - 1;
 }
 
@@ -303,22 +352,43 @@ type BracketEntrant =
   | { kind: 'winner'; matchId: string }
   | { kind: 'loser'; matchId: string };
 
-function padWithByes<T>(entries: T[], seedMode: ScheduleSeedMode): (T | null)[] {
-  const size = nextPowerOfTwo(Math.max(2, entries.length));
-  const slots: (T | null)[] = Array(size).fill(null);
-  const positions =
-    seedMode === 'random'
-      ? shuffle([...Array(size).keys()])
-      : [...Array(size).keys()];
-  entries.forEach((entry, i) => {
-    slots[positions[i]] = entry;
-  });
-  return slots;
+/** 首轮对阵：奇数人数时 (选手, null) 为轮空；偶数人数两两对阵，无轮空 */
+function buildFirstRoundPairings<T>(
+  entrants: readonly T[],
+  seedMode: ScheduleSeedMode,
+): [T, T | null][] {
+  const n = entrants.length;
+  const ordered =
+    seedMode === 'random' ? shuffle([...entrants]) : [...entrants];
+
+  if (n % 2 === 0) {
+    const pairs: [T, T | null][] = [];
+    for (let i = 0; i < n; i += 2) {
+      pairs.push([ordered[i]!, ordered[i + 1]!]);
+    }
+    return pairs;
+  }
+
+  const size = nextPowerOfTwo(n);
+  const byeCount = size - n;
+  const matchPlayers = n - byeCount;
+  const regularPairs = matchPlayers / 2;
+  const pairs: [T, T | null][] = [];
+  let i = 0;
+  for (let p = 0; p < regularPairs; p++) {
+    pairs.push([ordered[i]!, ordered[i + 1]!]);
+    i += 2;
+  }
+  for (; i < n; i++) {
+    pairs.push([ordered[i]!, null]);
+  }
+  return pairs;
 }
 
-function stageForBracketRound(roundSize: number): KnockoutStage {
-  if (roundSize <= 2) return 'final';
-  if (roundSize === 4) return 'semi';
+/** 按本轮剩余人数决定阶段标签 */
+function stageForBracketRound(remaining: number): KnockoutStage {
+  if (remaining <= 2) return 'final';
+  if (remaining <= 4) return 'semi';
   return 'quarter';
 }
 
@@ -327,6 +397,7 @@ function createKnockoutAdd(matches: Match[], startOrder: number) {
   return (
     stage: KnockoutStage,
     rankTier: number,
+    round: number,
     slotA: KnockoutSlot | null,
     slotB: KnockoutSlot | null,
     sideAIds: string[] = [],
@@ -338,6 +409,7 @@ function createKnockoutAdd(matches: Match[], startOrder: number) {
       phase: 'knockout',
       group: null,
       knockoutStage: stage,
+      knockoutRound: round,
       knockoutRank: rankTier,
       slotA,
       slotB,
@@ -373,13 +445,18 @@ function entrantToSides(e: BracketEntrant): string[] {
 function addByeAdvance(
   add: ReturnType<typeof createKnockoutAdd>,
   rankTier: number,
+  round: number,
   entrant: BracketEntrant,
+  stage: KnockoutStage = 'bye',
 ): Match {
   if (entrant.kind === 'sides') {
-    return add('bye', rankTier, null, null, entrant.sideIds, [], true);
+    return add(stage, rankTier, round, null, null, entrant.sideIds, [], true);
   }
   if (entrant.kind === 'slot') {
-    return add('bye', rankTier, entrant.slot, null, [], [], true);
+    return add(stage, rankTier, round, entrant.slot, null, [], [], true);
+  }
+  if (entrant.kind === 'winner' || entrant.kind === 'loser') {
+    return add(stage, rankTier, round, entrant, null, [], [], true);
   }
   throw new Error('bye advance requires sides or slot entrant');
 }
@@ -387,6 +464,7 @@ function addByeAdvance(
 function addPairMatch(
   add: ReturnType<typeof createKnockoutAdd>,
   rankTier: number,
+  round: number,
   stage: KnockoutStage,
   a: BracketEntrant,
   b: BracketEntrant,
@@ -394,6 +472,7 @@ function addPairMatch(
   return add(
     stage,
     rankTier,
+    round,
     entrantToSlot(a),
     entrantToSlot(b),
     entrantToSides(a),
@@ -411,13 +490,27 @@ function buildEliminationBracket(
 ): void {
   if (entrants.length === 2) {
     const stage = entrants[0].kind === 'slot' ? 'cross' : 'final';
-    addPairMatch(add, rankTier, stage, entrants[0], entrants[1]);
+    addPairMatch(add, rankTier, 1, stage, entrants[0], entrants[1]);
     return;
   }
 
-  let current: (BracketEntrant | null)[] = padWithByes(entrants, seedMode);
+  const firstPairs = buildFirstRoundPairings(entrants, seedMode);
+  const firstStage = stageForBracketRound(firstPairs.length * 2);
+  let current: BracketEntrant[] = [];
+  let round = 1;
+
+  for (const [a, b] of firstPairs) {
+    if (b === null) {
+      const byeM = addByeAdvance(add, rankTier, round, a, 'bye');
+      current.push({ kind: 'winner', matchId: byeM.id });
+    } else {
+      const m = addPairMatch(add, rankTier, round, firstStage, a, b);
+      current.push({ kind: 'winner', matchId: m.id });
+    }
+  }
 
   while (current.length > 1) {
+    round += 1;
     if (current.length === 2) {
       const a = current[0]!;
       const b = current[1]!;
@@ -426,9 +519,9 @@ function buildEliminationBracket(
       const semiB =
         b.kind === 'winner' || b.kind === 'loser' ? b : null;
       if (semiA && semiB) {
-        add('final', rankTier, semiA, semiB);
+        add('final', rankTier, round, semiA, semiB);
       } else {
-        addPairMatch(add, rankTier, 'final', a, b);
+        addPairMatch(add, rankTier, round, 'final', a, b);
       }
       return;
     }
@@ -436,22 +529,17 @@ function buildEliminationBracket(
     const next: BracketEntrant[] = [];
     const stage = stageForBracketRound(current.length);
 
-    for (let i = 0; i < current.length; i += 2) {
-      const a = current[i];
-      const b = current[i + 1];
-      if (!a && !b) continue;
-      if (a && !b) {
-        const byeM = addByeAdvance(add, rankTier, a);
+    for (let i = 0; i < current.length; ) {
+      if (i === current.length - 1) {
+        const byeM = addByeAdvance(add, rankTier, round, current[i]!, stage);
         next.push({ kind: 'winner', matchId: byeM.id });
-        continue;
+        break;
       }
-      if (!a && b) {
-        const byeM = addByeAdvance(add, rankTier, b);
-        next.push({ kind: 'winner', matchId: byeM.id });
-        continue;
-      }
-      const m = addPairMatch(add, rankTier, stage, a!, b!);
+      const a = current[i]!;
+      const b = current[i + 1]!;
+      const m = addPairMatch(add, rankTier, round, stage, a, b);
       next.push({ kind: 'winner', matchId: m.id });
+      i += 2;
     }
     current = next;
   }

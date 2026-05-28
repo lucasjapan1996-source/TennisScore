@@ -13,7 +13,7 @@ import {
   buildPureKnockoutSchedule,
   countKnockoutMatches,
   countPureKnockoutMatches,
-  nextPowerOfTwo,
+  initialKnockoutBracketSize,
 } from './knockout';
 import { getActiveStrings } from '../i18n';
 import {
@@ -58,6 +58,7 @@ function emptyGroupMatch(
     phase: 'group',
     group,
     knockoutStage: null,
+    knockoutRound: null,
     knockoutRank: null,
     slotA: null,
     slotB: null,
@@ -86,6 +87,7 @@ function emptyRoundRobinMatch(
     phase: 'group',
     group: null,
     knockoutStage: null,
+    knockoutRound: null,
     knockoutRank: null,
     slotA: null,
     slotB: null,
@@ -571,8 +573,8 @@ export function validateBeforeSchedule(
     const entityCount = mode === 'singles' ? players.length : teams.length;
     const bracketSize =
       scheduleFormat === 'knockout'
-        ? nextPowerOfTwo(entityCount)
-        : nextPowerOfTwo(groupCount);
+        ? initialKnockoutBracketSize(entityCount)
+        : initialKnockoutBracketSize(groupCount);
     if (bracketSize > 32) return getActiveStrings().errKnockoutTooMany;
   }
   return null;

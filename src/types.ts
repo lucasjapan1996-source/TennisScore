@@ -74,6 +74,8 @@ export interface Match {
   /** 小组赛组别（1 起）；淘汰赛为 null */
   group: number | null;
   knockoutStage: KnockoutStage | null;
+  /** 淘汰赛轮次（1=首轮），非淘汰赛为 null */
+  knockoutRound: number | null;
   /** 对应小组名次（第几名）的淘汰赛，循环赛为 null */
   knockoutRank: number | null;
   slotA: KnockoutSlot | null;

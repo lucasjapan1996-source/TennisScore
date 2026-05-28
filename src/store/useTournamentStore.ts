@@ -817,6 +817,10 @@ export const useTournamentStore = create<TournamentState>()(
                 phase,
                 group: legacy.group ?? null,
                 knockoutStage: legacy.knockoutStage ?? null,
+                knockoutRound:
+                  typeof (legacy as Match).knockoutRound === 'number'
+                    ? (legacy as Match).knockoutRound
+                    : null,
                 knockoutRank:
                   typeof legacy.knockoutRank === 'number'
                     ? legacy.knockoutRank
