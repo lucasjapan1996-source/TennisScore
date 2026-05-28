@@ -426,7 +426,6 @@ function collectTierEntrantIds(
 function resolvedMatchWinnerLoser(
   m: Match,
   tournament: ResolveSidesTournament & StandingTournamentFields,
-  players: Player[],
 ): { winnerId: string; loserId: string | null } | null {
   const showGender = showPlayerGender(tournament.category);
   const resolved = resolveMatchSides(m, tournament, (ids, pls) =>
@@ -453,12 +452,11 @@ function entityKnockoutDepthInTier(
   entityId: string,
   tierMatches: Match[],
   resolveCtx: ResolveSidesTournament & StandingTournamentFields,
-  players: Player[],
 ): number {
   let best = 0;
   for (const m of tierMatches) {
     const round = m.knockoutRound ?? 0;
-    const wl = resolvedMatchWinnerLoser(m, resolveCtx, players);
+    const wl = resolvedMatchWinnerLoser(m, resolveCtx);
     if (!wl) continue;
     if (wl.loserId === entityId) return round;
     if (wl.winnerId === entityId) best = Math.max(best, round);
@@ -505,7 +503,7 @@ function computeTwoGroupCrossTierPlacements(
     ) ?? tierMatches.find((m) => !m.isBye);
 
   if (crossMatch) {
-    const wl = resolvedMatchWinnerLoser(crossMatch, resolveCtx, players);
+    const wl = resolvedMatchWinnerLoser(crossMatch, resolveCtx);
     if (wl?.loserId) {
       placements.set(wl.winnerId, 1);
       placements.set(wl.loserId, 2);
@@ -582,7 +580,7 @@ function computeKnockoutTierPlacements(
       ) ?? topRound[topRound.length - 1];
 
     if (final) {
-      const wl = resolvedMatchWinnerLoser(final, resolveCtx, players);
+      const wl = resolvedMatchWinnerLoser(final, resolveCtx);
       if (wl?.loserId) {
         placements.set(wl.winnerId, 1);
         placements.set(wl.loserId, 2);
@@ -595,7 +593,7 @@ function computeKnockoutTierPlacements(
         .filter((m) => (m.knockoutRound ?? 0) === round)
         .sort((a, b) => a.order - b.order);
       for (const m of roundMatches) {
-        const wl = resolvedMatchWinnerLoser(m, resolveCtx, players);
+        const wl = resolvedMatchWinnerLoser(m, resolveCtx);
         if (!wl?.loserId || placements.has(wl.loserId)) continue;
         placements.set(wl.loserId, place++);
       }
@@ -606,8 +604,8 @@ function computeKnockoutTierPlacements(
   const unplaced = tierEntrants.filter((id) => !placements.has(id));
   if (unplaced.length > 0) {
     const sorted = [...unplaced].sort((a, b) => {
-      const depthB = entityKnockoutDepthInTier(b, tierMatches, resolveCtx, players);
-      const depthA = entityKnockoutDepthInTier(a, tierMatches, resolveCtx, players);
+      const depthB = entityKnockoutDepthInTier(b, tierMatches, resolveCtx);
+      const depthA = entityKnockoutDepthInTier(a, tierMatches, resolveCtx);
       if (depthB !== depthA) return depthB - depthA;
       return compareGroupPhaseStats(
         a,
