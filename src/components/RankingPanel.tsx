@@ -5,11 +5,10 @@ import {
   computeGroupAndKnockoutStandings,
   computeStandings,
 } from '../utils/ranking';
-import { computePodium } from '../utils/podium';
 import { isMatchPlayed } from '../utils/score';
 import { withoutThirdPlaceMatches } from '../utils/schedule';
-import { PodiumDisplay } from './PodiumDisplay';
 import { MatchResultsCard } from './MatchResultsCard';
+import { RankMedal } from './RankMedal';
 import { renderStandingName } from './PlayerLabel';
 import { useStrings } from '../hooks/useStrings';
 import type { DoublesPairing, MatchMode, Player, ScheduleFormat, StandingRow, Team } from '../types';
@@ -19,7 +18,8 @@ import { CollapsiblePanel } from './CollapsiblePanel';
 
 export function RankingPanel() {
   const S = useStrings();
-  const { tournament, setActiveTab } = useTournamentStore();
+  const tournament = useTournamentStore((s) => s.tournament);
+  const setActiveTab = useTournamentStore((s) => s.setActiveTab);
   const isGroupStage = tournament.scheduleFormat === 'group_stage';
   const isKnockoutOnly = tournament.scheduleFormat === 'knockout';
   const isSingles = tournament.mode === 'singles';
@@ -44,8 +44,6 @@ export function RankingPanel() {
   );
 
   const finished = activeMatches.filter((m) => isMatchPlayed(m)).length;
-
-  const podium = useMemo(() => computePodium(tournament), [tournament]);
 
   const groupStageFinalStandings = useMemo(
     () =>
@@ -118,24 +116,30 @@ export function RankingPanel() {
     );
   }
 
+  if (finished === 0) {
+    return (
+      <section className="panel">
+        <p className="empty-state" title={S.noDataTitle}>
+          <span aria-hidden>🏆</span>
+          <br />
+          {S.noRank}
+          <br />
+          <button
+            type="button"
+            className="btn-primary"
+            style={{ marginTop: '1rem' }}
+            onClick={() => setActiveTab('matches')}
+            title={S.goScoreTitle}
+          >
+            {S.goScore}
+          </button>
+        </p>
+      </section>
+    );
+  }
+
   return (
     <>
-      {podium && (
-        <CollapsiblePanel
-          title={S.podiumTitle}
-          titleTitle={S.podiumTitle}
-          compact
-          className="podium-panel"
-        >
-          <PodiumDisplay
-            places={podium}
-            players={tournament.players}
-            teams={tournament.teams}
-            mode={tournament.mode}
-          />
-        </CollapsiblePanel>
-      )}
-
       <CollapsiblePanel
         title={rankingTitle}
         titleTitle={
@@ -223,24 +227,27 @@ function StandingsTable({
           {rows.map((row) => (
             <tr
               key={row.id}
-              className={row.rank === 1 ? 'top1' : ''}
+              className={
+                row.rank === 1
+                  ? 'rank-top1'
+                  : row.rank === 2
+                    ? 'rank-top2'
+                    : undefined
+              }
               title={
                 scheduleFormat === 'group_stage'
                   ? row.rank === 1
                     ? S.champion
-                    : S.rankN(row.rank)
+                    : row.rank === 2
+                      ? S.podiumSilver
+                      : S.rankN(row.rank)
                   : S.standingRowTitle(row.rank, row.gameDiff)
               }
             >
-              <td className="num">
-                <span
-                  className={`rank-badge${row.rank === 1 ? ' gold' : ''}`}
-                  title={row.rank === 1 ? S.champion : S.rankN(row.rank)}
-                >
-                  {row.rank}
-                </span>
+              <td className="num rank-col">
+                <RankMedal rank={row.rank} />
               </td>
-              <td>
+              <td className="rank-name-col">
                 {renderStandingName(row.id, players, mode, teams, showGender, {
                   scheduleFormat,
                   doublesPairing,

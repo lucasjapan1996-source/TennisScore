@@ -126,6 +126,7 @@ export function formatSideCompactLabel(
   sideIds: string[],
   players: Player[],
   showGender = true,
+  showLevel = true,
 ): string {
   return sideIds
     .map((id) => {
@@ -133,7 +134,8 @@ export function formatSideCompactLabel(
       if (!p) return '?';
       const meta: string[] = [];
       if (showGender) meta.push(genderSymbol(p.gender));
-      meta.push(getActiveStrings().levelLabel(p.level));
+      if (showLevel) meta.push(getActiveStrings().levelLabel(p.level));
+      if (meta.length === 0) return p.name;
       return `${p.name} (${meta.join(' ')})`;
     })
     .join('/');

@@ -46,6 +46,7 @@ export function renderMatchSides(
   mode: MatchMode,
   teams: Team[] = [],
   showGender = true,
+  showLevel = true,
 ): ReactNode {
   const S = getActiveStrings();
   if (sideIds.length === 0) return S.unknown;
@@ -53,7 +54,7 @@ export function renderMatchSides(
   if (mode === 'singles') {
     const p = players.find((pl) => pl.id === sideIds[0]);
     return p ? (
-      <PlayerLabel player={p} showLevel showGender={showGender} />
+      <PlayerLabel player={p} showLevel={showLevel} showGender={showGender} />
     ) : (
       S.unknown
     );
@@ -101,7 +102,7 @@ export function renderStandingName(
   ) {
     const p = players.find((pl) => pl.id === entityId);
     return p ? (
-      <PlayerLabel player={p} showLevel showGender={showGender} />
+      <PlayerLabel player={p} showGender={showGender} />
     ) : (
       entityId
     );

@@ -14,7 +14,7 @@ export function MatchResultsCard() {
   const { tournament } = useTournamentStore();
   const genderVisible = showPlayerGender(tournament.category);
   const compactLabel = (sideIds: string[]) =>
-    formatSideCompactLabel(sideIds, tournament.players, genderVisible);
+    formatSideCompactLabel(sideIds, tournament.players, genderVisible, false);
 
   const playedMatches = useMemo(() => {
     const list = withoutThirdPlaceMatches(
@@ -84,6 +84,7 @@ export function MatchResultsCard() {
                         tournament.mode,
                         tournament.teams,
                         genderVisible,
+                        false,
                       )}
                       <span className="match-results-vs">{S.matchupVs}</span>
                       {renderMatchSides(
@@ -92,6 +93,7 @@ export function MatchResultsCard() {
                         tournament.mode,
                         tournament.teams,
                         genderVisible,
+                        false,
                       )}
                     </span>
                     <span className="match-results-score">
