@@ -29,6 +29,7 @@ import {
   knockoutMatchLabel,
   resolveKnockoutSideIds,
   resolveMatchSides,
+  slotLabel,
 } from '../utils/knockout';
 import { formatMatchScoreForRow } from '../utils/score';
 import { getActiveStrings } from '../i18n';
@@ -128,6 +129,14 @@ export function ScheduleOverview({
     if (m.isBye) {
       const resolved = resolveMatchSides(m, resolveCtx, nameLabel);
       return formatKnockoutByeLine(resolved.labelA);
+    }
+    if (
+      isGroupStage &&
+      m.phase === 'knockout' &&
+      m.slotA?.kind === 'group_rank' &&
+      m.slotB?.kind === 'group_rank'
+    ) {
+      return `${slotLabel(m.slotA)} vs ${slotLabel(m.slotB)}`;
     }
     const sideAIds =
       m.sideAIds.length > 0

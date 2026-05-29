@@ -1,4 +1,5 @@
 import type { Strings } from './types';
+import { groupLetter } from './groupLetter';
 
 /** 日本語 */
 export const jaStrings: Strings = {
@@ -160,7 +161,7 @@ export const jaStrings: Strings = {
   groupCount: 'グループ数',
   groupCountTitle: 'ランダム振分（各組2名以上）。KOはバイで調整',
   groupAssignment: 'グループ分け結果',
-  groupLabel: (n) => `第 ${n} 組`,
+  groupLabel: (n) => `${groupLetter(n)}組`,
   groupMembers: (n) => `${n} 名`,
   groupMemberSeparator: ' · ',
   scheduleTitle: '現在の設定で対戦表を生成',
@@ -225,7 +226,7 @@ export const jaStrings: Strings = {
   knockoutThirdLegacy: '3位決定戦（無効）',
   knockoutFinal: '決勝',
   knockoutRoundLabel: (round) => `第 ${round} 回戦`,
-  knockoutSlotGroupRank: (group, _rank) => `第 ${group} 組`,
+  knockoutSlotGroupRank: (group, rank) => `${groupLetter(group)}組${rank}位`,
   knockoutSlotWinner: '前試合の勝者',
   knockoutSlotLoser: '前試合の敗者',
   knockoutWaitGroup: 'グループ戦をすべて完了してください',
@@ -249,7 +250,7 @@ export const jaStrings: Strings = {
   filterAllGroups: 'すべて',
   filterAllGroupsTitle: '全試合を表示',
   filterGroupTitle: (g, done, total) =>
-    `第 ${g} 組：${done}/${total} 試合入力済`,
+    `${groupLetter(g)}組：${done}/${total} 試合入力済`,
   filterKnockoutTitle: 'KOのみ表示',
   filterByStatus: '状態で絞込',
   noMatchesInFilter: '条件に合う試合がありません',
@@ -290,7 +291,7 @@ export const jaStrings: Strings = {
     'グループ循環で組内順位を決め、同順位どうしでクロスKO。本表はKO結果順で、ゲーム差は使いません',
   rankingGroupStageHintShort: 'KO順位、ゲーム差なし',
   rankingOverall: 'リーグ総合順位',
-  groupStandingsTitle: (g) => `第 ${g} 組順位表`,
+  groupStandingsTitle: (g) => `${groupLetter(g)}組順位表`,
   groupStandingsAll: '総合順位',
   combinedRankHintKnockout:
     'KOの入力済み試合を集計。表は順位とゲーム差のみ',
