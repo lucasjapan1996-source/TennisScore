@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['djokovic-logo.png', 'icon-512.png'],
+      includeAssets: ['logo.png', 'icon-512.png'],
       manifest: {
         name: 'Tennis Score',
         short_name: 'Tennis Score',
