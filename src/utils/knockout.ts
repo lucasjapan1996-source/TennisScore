@@ -92,12 +92,13 @@ export function formatKnockoutByeLine(winnerLabel: string): string {
 
 export function knockoutMatchLabel(m: Match): string {
   if (m.isBye) return getActiveStrings().knockoutBye;
-  const tier = m.knockoutRank ?? 1;
   if (m.knockoutStage === 'cross') {
-    return getActiveStrings().knockoutCrossRank(tier);
+    return getActiveStrings().knockoutCrossRank(m.knockoutRank ?? 1);
   }
-  const stage = m.knockoutStage ? knockoutStageLabel(m.knockoutStage) : getActiveStrings().knockoutStage;
-  return getActiveStrings().knockoutRankMatch(tier, stage);
+  const stage = m.knockoutStage
+    ? knockoutStageLabel(m.knockoutStage)
+    : getActiveStrings().knockoutStage;
+  return getActiveStrings().knockoutRankMatch(m.knockoutRank ?? 1, stage);
 }
 
 function getMatchWinnerIds(m: Match, tournament: KnockoutResolveTournament): string[] | null {
@@ -190,7 +191,7 @@ export function isGroupStageCompleteForKnockout(
   return groupMatches.length > 0 && groupMatches.every((m) => isMatchPlayed(m));
 }
 
-function resolveKnockoutSideIds(
+export function resolveKnockoutSideIds(
   m: Match,
   side: 'A' | 'B',
   tournament: KnockoutResolveTournament,

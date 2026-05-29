@@ -236,9 +236,13 @@ export const jaStrings: Strings = {
   knockoutBye: 'バイ',
   knockoutByeShort: 'バイで進出',
   knockoutPlayerBye: (player) => `${player} バイ`,
-  knockoutCross: '交叉',
-  knockoutCrossRank: (rank) =>
-    rank === 1 ? '交叉' : `交叉（第 ${rank} 枠）`,
+  knockoutCross: '優勝・準優',
+  knockoutCrossRank: (rank) => {
+    if (rank === 1) return '優勝・準優';
+    const lo = rank * 2 - 1;
+    const hi = rank * 2;
+    return `${lo}-${hi}`;
+  },
   knockoutRankMatch: (_rank, stage) => stage,
 
   filterByGroup: '段階で絞込',

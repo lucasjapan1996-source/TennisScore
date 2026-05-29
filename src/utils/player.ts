@@ -6,6 +6,7 @@ import {
   type Player,
   type PlayerGender,
   type PlayerLevel,
+  type Team,
 } from '../types';
 import { getActiveStrings } from '../i18n';
 import { genderSymbol } from './gender';
@@ -81,6 +82,42 @@ export function formatScheduleMatchLine(
 ): string {
   const a = formatScheduleSideLabel(sideAIds, players, mode);
   const b = formatScheduleSideLabel(sideBIds, players, mode);
+  return `${a} vs ${b}`;
+}
+
+/** 对阵表一行：显示选手/队伍姓名（小组赛等） */
+export function formatScheduleSideNameLabel(
+  sideIds: string[],
+  players: Player[],
+  mode: MatchMode,
+  teams: Team[] = [],
+): string {
+  if (sideIds.length === 0) return '?';
+  if (mode === 'singles') {
+    return players.find((p) => p.id === sideIds[0])?.name ?? '?';
+  }
+  const key = [...sideIds].sort().join(',');
+  const team = teams.find(
+    (t) =>
+      [...t.playerIds].sort().join(',') === key ||
+      (t.playerIds.length === sideIds.length &&
+        t.playerIds.every((pid) => sideIds.includes(pid))),
+  );
+  const ids = team ? [...team.playerIds] : sideIds;
+  return ids
+    .map((id) => players.find((p) => p.id === id)?.name ?? '?')
+    .join('/');
+}
+
+export function formatScheduleMatchLineByName(
+  sideAIds: string[],
+  sideBIds: string[],
+  players: Player[],
+  mode: MatchMode,
+  teams: Team[] = [],
+): string {
+  const a = formatScheduleSideNameLabel(sideAIds, players, mode, teams);
+  const b = formatScheduleSideNameLabel(sideBIds, players, mode, teams);
   return `${a} vs ${b}`;
 }
 

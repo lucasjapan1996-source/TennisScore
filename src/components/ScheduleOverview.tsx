@@ -19,11 +19,15 @@ import {
   matchPairKey,
   splitMatchesByBatches,
 } from '../utils/schedule';
-import { formatScheduleMatchLine, formatSideCompactLabel } from '../utils/player';
-import { showPlayerGender } from '../utils/tournamentCategory';
+import {
+  formatScheduleMatchLine,
+  formatScheduleMatchLineByName,
+  formatScheduleSideNameLabel,
+} from '../utils/player';
 import {
   formatKnockoutByeLine,
   knockoutMatchLabel,
+  resolveKnockoutSideIds,
   resolveMatchSides,
 } from '../utils/knockout';
 import { formatMatchScoreForRow } from '../utils/score';
@@ -117,9 +121,30 @@ export function ScheduleOverview({
   const S = useStrings();
   const isGroupStage = scheduleFormat === 'group_stage';
   const isKnockoutOnly = scheduleFormat === 'knockout';
-  const genderVisible = showPlayerGender(category);
-  const compactLabel = (sideIds: string[], pls: Player[]) =>
-    formatSideCompactLabel(sideIds, pls, genderVisible);
+  const nameLabel = (sideIds: string[], pls: Player[]) =>
+    formatScheduleSideNameLabel(sideIds, pls, mode, teams);
+
+  const buildMatchupLine = (m: Match) => {
+    if (m.isBye) {
+      const resolved = resolveMatchSides(m, resolveCtx, nameLabel);
+      return formatKnockoutByeLine(resolved.labelA);
+    }
+    const sideAIds =
+      m.sideAIds.length > 0
+        ? m.sideAIds
+        : (resolveKnockoutSideIds(m, 'A', resolveCtx) ?? []);
+    const sideBIds =
+      m.sideBIds.length > 0
+        ? m.sideBIds
+        : (resolveKnockoutSideIds(m, 'B', resolveCtx) ?? []);
+    if (sideAIds.length > 0 && sideBIds.length > 0) {
+      return isGroupStage
+        ? formatScheduleMatchLineByName(sideAIds, sideBIds, players, mode, teams)
+        : formatScheduleMatchLine(sideAIds, sideBIds, players, mode);
+    }
+    const resolved = resolveMatchSides(m, resolveCtx, nameLabel);
+    return `${resolved.labelA} vs ${resolved.labelB}`;
+  };
 
   const bySection = useMemo(() => {
     const grouped = groupMatchesBySection(matches, scheduleFormat);
@@ -229,28 +254,15 @@ export function ScheduleOverview({
             )}
             <ol className="schedule-match-list">
               {sectionMatches.map((m) => {
-                const resolved = resolveMatchSides(m, resolveCtx, compactLabel);
-                const canFormatLine =
-                  !m.isBye &&
-                  m.sideAIds.length > 0 &&
-                  m.sideBIds.length > 0;
-                const matchupLine = m.isBye
-                  ? formatKnockoutByeLine(resolved.labelA)
-                  : canFormatLine
-                    ? formatScheduleMatchLine(
-                        m.sideAIds,
-                        m.sideBIds,
-                        players,
-                        mode,
-                      )
-                    : `${resolved.labelA} vs ${resolved.labelB}`;
+                const resolved = resolveMatchSides(m, resolveCtx, nameLabel);
+                const matchupLine = buildMatchupLine(m);
                 const markedDone = isMatchScheduleMarkedDone(m);
                 const canToggle =
                   !m.isBye &&
                   !!onToggleMatchStatus &&
                   resolved.ready &&
-                  m.sideAIds.length > 0 &&
-                  m.sideBIds.length > 0;
+                  resolved.sideAIds.length > 0 &&
+                  resolved.sideBIds.length > 0;
                 const stageLabel =
                   m.knockoutStage != null ? knockoutMatchLabel(m) : null;
                 return (
