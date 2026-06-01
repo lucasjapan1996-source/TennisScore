@@ -17,6 +17,7 @@
   --tab-bar-btn-min-h: 2.75rem;
   --tab-bar-padding-y: 0.32rem;
   --scroll-bottom-gap: 0.75rem;
+  --main-bottom-pad: 0.35rem;
   /* 含 Tab + 版权行 + 安全区；运行时会用实测高度覆盖 */
   --bottom-chrome-h: calc(
     var(--tab-bar-btn-min-h) + var(--tab-bar-padding-y) + var(--footer-h) +
@@ -314,8 +315,8 @@ textarea:focus {
   overscroll-behavior-y: contain;
   touch-action: pan-y;
   padding: 0.35rem calc(0.6rem + var(--safe-right))
-    calc(0.35rem + var(--bottom-chrome-h)) calc(0.6rem + var(--safe-left));
-  scroll-padding-bottom: calc(0.35rem + var(--bottom-chrome-h));
+    calc(var(--main-bottom-pad) + var(--bottom-chrome-h)) calc(0.6rem + var(--safe-left));
+  scroll-padding-bottom: calc(var(--main-bottom-pad) + var(--bottom-chrome-h));
   width: 100%;
   max-width: 100%;
   background: var(--bg);
@@ -2567,9 +2568,12 @@ p.row + p,
 }
 
 /*
- * iOS 主屏幕 PWA：不用 100dvh（常高于可见区域导致底部白条），
- * 用 fixed 贴满屏幕；顶部/底部安全区分别只加在 header / 固定底栏。
+ * PWA（display-mode: standalone）：不用 100dvh，固定贴满视口；
+ * 隐藏版权行、收紧底栏，减小主内容区底部留白。
  */
+html.is-pwa,
+html.is-pwa body,
+html.is-pwa #root,
 html.is-standalone,
 html.is-standalone body,
 html.is-standalone #root {
@@ -2579,10 +2583,12 @@ html.is-standalone #root {
   overflow: hidden;
 }
 
+html.is-pwa #root,
 html.is-standalone #root {
   display: block;
 }
 
+html.is-pwa,
 html.is-standalone {
   --safe-top-inset: env(safe-area-inset-top, 0px);
   --safe-top: var(--safe-top-inset);
@@ -2592,10 +2598,12 @@ html.is-standalone {
   --tab-row-h: 2.35rem;
   --tab-bar-btn-min-h: var(--tab-row-h);
   --tab-bar-padding-y: 0.16rem;
-  --scroll-bottom-gap: 1rem;
+  --scroll-bottom-gap: 0.25rem;
+  --main-bottom-pad: 0.2rem;
   --tab-icon-size: 1.42rem;
 }
 
+html.is-pwa .app-shell,
 html.is-standalone .app-shell {
   position: fixed;
   top: 0;
@@ -2612,6 +2620,7 @@ html.is-standalone .app-shell {
   box-sizing: border-box;
 }
 
+html.is-pwa .app-header,
 html.is-standalone .app-header {
   padding-top: calc(var(--header-pad-top) + var(--safe-top-inset));
   padding-right: 0.65rem;
@@ -2619,46 +2628,48 @@ html.is-standalone .app-header {
   padding-left: 0.65rem;
 }
 
+html.is-pwa .app-main,
 html.is-standalone .app-main {
   padding: 0.35rem calc(0.6rem + var(--safe-right))
-    calc(0.35rem + var(--bottom-chrome-h)) calc(0.6rem + var(--safe-left));
-  scroll-padding-bottom: calc(0.35rem + var(--bottom-chrome-h));
+    calc(var(--main-bottom-pad) + var(--bottom-chrome-h)) calc(0.6rem + var(--safe-left));
+  scroll-padding-bottom: calc(var(--main-bottom-pad) + var(--bottom-chrome-h));
 }
 
+html.is-pwa .app-footer,
 html.is-standalone .app-footer {
   display: none;
 }
 
+html.is-pwa .app-bottom-chrome,
 html.is-standalone .app-bottom-chrome {
-  padding-bottom: var(--safe-bottom-inset);
+  padding-bottom: max(0px, env(safe-area-inset-bottom, 0px));
 }
 
+html.is-pwa .tab-bar,
 html.is-standalone .tab-bar {
   padding: 0.1rem 0.4rem 0.06rem;
 }
 
+html.is-pwa .tab-bar button,
 html.is-standalone .tab-bar button {
   padding: 0.1rem 0.06rem 0.06rem;
   gap: 0.08rem;
   min-height: var(--tab-row-h);
 }
 
+html.is-pwa .tab-bar button .icon,
 html.is-standalone .tab-bar button .icon {
   font-size: var(--tab-icon-size);
 }
 
+html.is-pwa .tab-bar button .tab-label,
 html.is-standalone .tab-bar button .tab-label {
   font-size: 0.68rem;
 }
 
-@media (display-mode: standalone) {
-  :root {
-    --footer-h: 0;
-  }
-
-  .app-footer {
-    display: none;
-  }
+/* 浏览器内：保留版权行，底栏含 footer 高度 */
+html.is-browser .app-footer {
+  display: block;
 }
 
 /* iOS Safari 浏览器内（非主屏幕 PWA） */

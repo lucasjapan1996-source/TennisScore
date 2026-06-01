@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { syncBottomChromeHeight } from './installStandaloneLayout';
+import { isPwaStandalone, syncBottomChromeHeight } from './installStandaloneLayout';
 import { useMobileScrollFix } from './hooks/useMobileScrollFix';
 import { useStrings } from './hooks/useStrings';
 import { PlayerPanel } from './components/PlayerPanel';
@@ -13,15 +13,18 @@ import { useTournamentStore } from './store/useTournamentStore';
 import { CollapsiblePanel } from './components/CollapsiblePanel';
 import type { TabId } from './types';
 
+
 export default function App() {
   useMobileScrollFix();
   const S = useStrings();
 
   const activeTab = useTournamentStore((s) => s.activeTab);
 
+  const isPwa = isPwaStandalone();
+
   useEffect(() => {
     requestAnimationFrame(syncBottomChromeHeight);
-  }, [activeTab]);
+  }, [activeTab, isPwa]);
   const setActiveTab = useTournamentStore((s) => s.setActiveTab);
   const resetTournament = useTournamentStore((s) => s.resetTournament);
   const tournamentName = useTournamentStore((s) => s.tournament.name);
@@ -36,9 +39,8 @@ export default function App() {
     { id: 'matches', label: S.tabMatches, icon: '✏️', title: S.tabMatchesTitle },
     { id: 'rankings', label: S.tabRankings, icon: '🏆', title: S.tabRankingsTitle },
   ];
-
   return (
-    <div className="app-shell">
+    <div className={`app-shell${isPwa ? ' app-shell-pwa' : ' app-shell-browser'}`}>
       <header className="app-header" title={S.appTitle}>
         <div className="app-header-inner">
           <AppLogo size={30} />
