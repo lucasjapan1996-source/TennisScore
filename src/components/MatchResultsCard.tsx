@@ -5,9 +5,42 @@ import { renderMatchSides } from './PlayerLabel';
 import { useStrings } from '../hooks/useStrings';
 import { knockoutMatchLabel, resolveMatchSides } from '../utils/knockout';
 import { formatSideCompactLabel } from '../utils/player';
-import { formatMatchScore, isMatchPlayed } from '../utils/score';
+import { formatMatchResultsScore, isMatchPlayed } from '../utils/score';
+import { isRetired } from '../utils/matchOutcome';
 import { groupMatchesBySection, withoutThirdPlaceMatches } from '../utils/schedule';
 import { showPlayerGender } from '../utils/tournamentCategory';
+
+import type { Match } from '../types';
+
+function MatchResultsSide({
+  side,
+  match,
+  sideIds,
+  players,
+  mode,
+  teams,
+  showGender,
+}: {
+  side: 'A' | 'B';
+  match: Match;
+  sideIds: string[];
+  players: Parameters<typeof renderMatchSides>[1];
+  mode: Parameters<typeof renderMatchSides>[2];
+  teams: Parameters<typeof renderMatchSides>[3];
+  showGender: boolean;
+}) {
+  const S = useStrings();
+  return (
+    <span className="match-results-side">
+      {renderMatchSides(sideIds, players, mode, teams, showGender, false)}
+      {isRetired(match) && match.retiredSide === side && (
+        <span className="match-results-retired-tag" title={S.retirementBannerTitle}>
+          （{S.retiredTag}）
+        </span>
+      )}
+    </span>
+  );
+}
 
 export function MatchResultsCard() {
   const S = useStrings();
@@ -78,26 +111,28 @@ export function MatchResultsCard() {
                   </div>
                   <div className="match-results-body">
                     <span className="match-results-sides">
-                      {renderMatchSides(
-                        m.sideAIds,
-                        tournament.players,
-                        tournament.mode,
-                        tournament.teams,
-                        genderVisible,
-                        false,
-                      )}
+                      <MatchResultsSide
+                        side="A"
+                        match={m}
+                        sideIds={m.sideAIds}
+                        players={tournament.players}
+                        mode={tournament.mode}
+                        teams={tournament.teams}
+                        showGender={genderVisible}
+                      />
                       <span className="match-results-vs">{S.matchupVs}</span>
-                      {renderMatchSides(
-                        m.sideBIds,
-                        tournament.players,
-                        tournament.mode,
-                        tournament.teams,
-                        genderVisible,
-                        false,
-                      )}
+                      <MatchResultsSide
+                        side="B"
+                        match={m}
+                        sideIds={m.sideBIds}
+                        players={tournament.players}
+                        mode={tournament.mode}
+                        teams={tournament.teams}
+                        showGender={genderVisible}
+                      />
                     </span>
                     <span className="match-results-score">
-                      {formatMatchScore(m)}
+                      {formatMatchResultsScore(m)}
                     </span>
                   </div>
                   {!resolved.ready && resolved.waitingReason && (

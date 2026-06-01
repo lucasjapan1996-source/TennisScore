@@ -2523,6 +2523,21 @@ p.row + p,
   white-space: nowrap;
 }
 
+.match-results-side {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.match-results-retired-tag {
+  color: #e55353;
+  font-size: 0.78em;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
 .match-results-vs {
   color: var(--muted);
   font-size: 0.75rem;

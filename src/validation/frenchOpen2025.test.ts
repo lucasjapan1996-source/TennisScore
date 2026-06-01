@@ -16,7 +16,7 @@ import {
 } from '../utils/matchOutcome';
 import { computePodium, isPodiumComplete } from '../utils/podium';
 import { computeGroupAndKnockoutStandings } from '../utils/ranking';
-import { formatMatchScore, isMatchPlayed } from '../utils/score';
+import { formatMatchScore, formatMatchResultsScore, isMatchPlayed } from '../utils/score';
 import { resolveMatchBestOf } from '../utils/bestOf';
 import { applySetsToMatchScores } from '../utils/score';
 import type { SetScore } from '../types';
@@ -238,6 +238,27 @@ describe('2025 French Open — logic regression', () => {
     expect(getMatchWinnerSide(retired, 3)).toBe('A');
     expect(isMatchPlayed(retired)).toBe(true);
     expect(formatMatchScore(retired)).toBe('退赛');
+    expect(formatMatchResultsScore(retired)).toBe('0 : 0');
+  });
+
+  it('退赛已录比分但退赛方领先：仍判对方胜，排名页显示原比分', () => {
+    const { matches } = buildKnockoutOnlySchedule(
+      [
+        { id: 'a', name: 'A', gender: 'male', level: 5 },
+        { id: 'b', name: 'B', gender: 'male', level: 5 },
+      ],
+      [],
+      'singles',
+      'sequential',
+    );
+    const m = knockouts(matches)[0]!;
+    const base = withScore(m, 2, 3);
+    const applied = applyRetirementScores('B', base, 1);
+    const retired = sanitizeRetiredMatch({ ...base, ...applied }, 1);
+    expect(retired.scoreA).toBe(2);
+    expect(retired.scoreB).toBe(3);
+    expect(getMatchWinnerSide(retired, 1)).toBe('A');
+    expect(formatMatchResultsScore(retired)).toBe('2 : 3');
   });
 
   it('退赛无比分：排名只计胜场不计净胜局', () => {

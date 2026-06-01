@@ -68,23 +68,8 @@ function formatSetLine(s: SetScore): string {
   return `${formatSideScore(s.gamesA, s.tiebreakA)}-${formatSideScore(s.gamesB, s.tiebreakB)}`;
 }
 
-export function formatMatchScore(m: Match): string {
-  if (m.isBye) return '';
-  if (isRetired(m)) {
-    const S = getActiveStrings();
-    const completedSets = (m.sets ?? []).filter(isCompleteSetScore);
-    const showScore =
-      m.scoreA !== null &&
-      m.scoreB !== null &&
-      (completedSets.length > 0 ||
-        m.tiebreakA > 0 ||
-        m.tiebreakB > 0 ||
-        m.scoreA + m.scoreB > 3);
-    if (showScore) {
-      return `${m.scoreA}:${m.scoreB} ${S.retiredTag}`;
-    }
-    return S.retiredTag;
-  }
+/** 比分数字部分（不含退赛标记） */
+function formatMatchScoreBody(m: Match): string {
   const completedSets = (m.sets ?? []).filter(isCompleteSetScore);
   if (completedSets.length > 0) {
     const { winsA, winsB } = countSetWins(completedSets);
@@ -96,6 +81,28 @@ export function formatMatchScore(m: Match): string {
   }
   if (m.scoreA === null || m.scoreB === null) return '';
   return `${formatSideScore(m.scoreA, m.tiebreakA)} : ${formatSideScore(m.scoreB, m.tiebreakB)}`;
+}
+
+export function formatMatchScore(m: Match): string {
+  if (m.isBye) return '';
+  if (isRetired(m)) {
+    const S = getActiveStrings();
+    const body = formatMatchScoreBody(m);
+    if (body) {
+      return `${body.replace(' : ', ':')} ${S.retiredTag}`;
+    }
+    return S.retiredTag;
+  }
+  return formatMatchScoreBody(m);
+}
+
+/** 排名页比赛比分：仅显示比分，退赛无录入时为 0 : 0 */
+export function formatMatchResultsScore(m: Match): string {
+  if (m.isBye) return '';
+  const body = formatMatchScoreBody(m);
+  if (body) return body;
+  if (isRetired(m)) return '0 : 0';
+  return '';
 }
 
 export function isMatchPlayed(m: Match): boolean {
