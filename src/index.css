@@ -4,6 +4,7 @@
   --safe-top-inset: env(safe-area-inset-top, 0px);
   --safe-top: var(--safe-top-inset);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --bottom-chrome-safe-bottom: var(--safe-bottom-inset);
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
   --header-pad-top: 0.3rem;
@@ -2592,6 +2593,7 @@ html.is-pwa,
 html.is-standalone {
   --safe-top-inset: env(safe-area-inset-top, 0px);
   --safe-top: var(--safe-top-inset);
+  --bottom-chrome-safe-bottom: min(env(safe-area-inset-bottom, 0px), 12px);
   --header-pad-top: 0.22rem;
   --header-pad-bottom: 0.28rem;
   --footer-h: 0;
@@ -2642,7 +2644,7 @@ html.is-standalone .app-footer {
 
 html.is-pwa .app-bottom-chrome,
 html.is-standalone .app-bottom-chrome {
-  padding-bottom: max(0px, env(safe-area-inset-bottom, 0px));
+  padding-bottom: var(--bottom-chrome-safe-bottom);
 }
 
 html.is-pwa .tab-bar,
