@@ -2593,7 +2593,7 @@ html.is-pwa,
 html.is-standalone {
   --safe-top-inset: env(safe-area-inset-top, 0px);
   --safe-top: var(--safe-top-inset);
-  --bottom-chrome-safe-bottom: min(env(safe-area-inset-bottom, 0px), 12px);
+  --bottom-chrome-safe-bottom: 0px;
   --header-pad-top: 0.22rem;
   --header-pad-bottom: 0.28rem;
   --footer-h: 0;
