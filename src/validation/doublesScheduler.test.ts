@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest';
 import {
   buildRotatingDoublesSchedule,
   buildSequentialDoublesWaves,
+  buildSequentialOneByeRotatingDoublesWaves,
   createDoublesScheduleState,
   evaluateScheduleQuality,
   scoreDoublesMatchDetailed,
   scheduleDoublesByRounds,
   buildDoublesCandidatePool,
 } from '../utils/doublesScheduler';
+import { analyzeMatchOrder } from '../utils/matchOrder';
 import { matchupKey } from '../utils/doublesRoundRobin';
 import { formatScheduleMatchLine } from '../utils/player';
 import { buildRoundRobinSchedule } from '../utils/schedule';
@@ -89,6 +91,30 @@ describe('doublesScheduler soft constraints', () => {
         }
       }
     }
+  });
+
+  it('5 players sequential: 12vs34 first, equal play, rest rotation', () => {
+    const ids = ['p1', 'p2', 'p3', 'p4', 'p5'];
+    const waves = buildSequentialOneByeRotatingDoublesWaves(ids);
+    expect(waves).toHaveLength(5);
+    expect(matchupKey(waves[0]!)).toBe('p1,p2|p3,p4');
+    expect(matchupKey(waves[1]!)).toBe('p2,p3|p4,p5');
+
+    const timeline = buildRotatingDoublesSchedule(ids, 'sequential');
+    expect(timeline).toHaveLength(5);
+    expect(matchupKey(timeline[0]!)).toBe('p1,p2|p3,p4');
+
+    const stats = analyzeMatchOrder(
+      timeline.map((m) => ({
+        participants: [...m.sideA, ...m.sideB],
+      })),
+    );
+    for (const id of ids) {
+      expect(stats.playCount.get(id)).toBe(4);
+    }
+    const q = evaluateScheduleQuality(timeline, ids);
+    expect(q.matchCountSpread).toBe(0);
+    expect(q.backToBackCount).toBeLessThan(18);
   });
 
   it('integration: UI line format for 8 players', () => {

@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { useTournamentStore } from '../store/useTournamentStore';
-import { estimateMatchCount } from '../utils/schedule';
+import {
+  estimateMatchCount,
+  isFixedDoublesPairingAllowed,
+} from '../utils/schedule';
 import { PlayerLabel } from './PlayerLabel';
 import { ScheduleOverview } from './ScheduleOverview';
 import { useStrings } from '../hooks/useStrings';
@@ -81,12 +84,13 @@ export function SetupPanel() {
   const isDoubles = tournament.mode === 'doubles';
   const isDoublesFixed = isDoubles && tournament.doublesPairing === 'fixed';
   const isDoublesRotating = isDoubles && tournament.doublesPairing === 'rotating';
+  const fixedDoublesAllowed = isFixedDoublesPairingAllowed(tournament.players.length);
 
   const entityCount =
     tournament.mode === 'singles'
       ? tournament.players.length
       : isDoublesRotating
-        ? Math.max(0, Math.floor(tournament.players.length / 2))
+        ? tournament.players.length
         : tournament.teams.length;
 
   const matchCount = estimateMatchCount(
@@ -159,8 +163,13 @@ export function SetupPanel() {
               <button
                 type="button"
                 className={isDoublesFixed ? 'active' : ''}
+                disabled={!fixedDoublesAllowed}
                 onClick={() => setDoublesPairing('fixed')}
-                title={S.doublesPairingFixedTitle}
+                title={
+                  fixedDoublesAllowed
+                    ? S.doublesPairingFixedTitle
+                    : S.doublesPairingFixedDisabledOdd
+                }
               >
                 {S.doublesPairingFixed}
               </button>

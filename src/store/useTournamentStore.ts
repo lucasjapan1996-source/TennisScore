@@ -12,6 +12,7 @@ import type {
   ScheduleSeedMode,
   SetScore,
   TabId,
+  Team,
   Tournament,
   TournamentCategory,
 } from '../types';
@@ -51,6 +52,8 @@ import {
   buildDoublesTeamsFromPlayers,
   appendScheduleMatches,
   buildScheduleFromSettings,
+  isFixedDoublesPairingAllowed,
+  normalizeDoublesPairingForPlayers,
   validateBeforeSchedule,
 } from '../utils/schedule';
 import {
@@ -64,8 +67,17 @@ function uid(): string {
   return crypto.randomUUID();
 }
 
-function shouldMaintainFixedTeams(t: Pick<Tournament, 'mode' | 'doublesPairing'>): boolean {
-  return t.mode === 'doubles' && t.doublesPairing === 'fixed';
+function doublesStateForPlayers(
+  mode: MatchMode,
+  pairing: DoublesPairing,
+  players: Player[],
+): { doublesPairing: DoublesPairing; teams: Team[] } {
+  if (mode !== 'doubles') {
+    return { doublesPairing: pairing, teams: [] };
+  }
+  const doublesPairing = normalizeDoublesPairingForPlayers(mode, pairing, players.length);
+  const teams = doublesPairing === 'fixed' ? autoPairPlayers(players) : [];
+  return { doublesPairing, teams };
 }
 
 function compactLabelForTournament(t: Tournament) {
@@ -175,17 +187,20 @@ export const useTournamentStore = create<TournamentState>()(
 
       setMode: (mode) =>
         set((s) => {
-          const players = s.tournament.players;
-          const teams =
-            mode === 'doubles' && players.length >= 2
-              ? autoPairPlayers(players)
-              : [];
+          const { players } = s.tournament;
+          const pairing =
+            mode === 'doubles' ? s.tournament.doublesPairing : DEFAULT_DOUBLES_PAIRING;
+          const { doublesPairing, teams } = doublesStateForPlayers(
+            mode,
+            pairing,
+            players,
+          );
           return {
             tournament: {
               ...s.tournament,
               mode,
               doublesPairing:
-                mode === 'doubles' ? s.tournament.doublesPairing : DEFAULT_DOUBLES_PAIRING,
+                mode === 'doubles' ? doublesPairing : DEFAULT_DOUBLES_PAIRING,
               teams,
               matches: [],
               groups: [],
@@ -197,14 +212,20 @@ export const useTournamentStore = create<TournamentState>()(
       setDoublesPairing: (doublesPairing) =>
         set((s) => {
           const { players } = s.tournament;
-          const teams =
-            doublesPairing === 'fixed' && players.length >= 2
-              ? autoPairPlayers(players)
-              : [];
+          const requested =
+            doublesPairing === 'fixed' &&
+            !isFixedDoublesPairingAllowed(players.length)
+              ? 'rotating'
+              : doublesPairing;
+          const { doublesPairing: next, teams } = doublesStateForPlayers(
+            'doubles',
+            requested,
+            players,
+          );
           return {
             tournament: {
               ...s.tournament,
-              doublesPairing,
+              doublesPairing: next,
               teams,
               matches: [],
               groups: [],
@@ -307,13 +328,16 @@ export const useTournamentStore = create<TournamentState>()(
             ...s.tournament.players,
             { id: uid(), name: trimmed, gender: effectiveGender, level },
           ];
-          const teams = shouldMaintainFixedTeams(s.tournament)
-            ? autoPairPlayers(players)
-            : s.tournament.teams;
+          const { doublesPairing, teams } = doublesStateForPlayers(
+            s.tournament.mode,
+            s.tournament.doublesPairing,
+            players,
+          );
           return {
             tournament: {
               ...s.tournament,
               players,
+              doublesPairing,
               teams,
               matches: [],
               groups: [],
@@ -335,13 +359,16 @@ export const useTournamentStore = create<TournamentState>()(
             level,
             uid,
           );
-          const teams = shouldMaintainFixedTeams(s.tournament)
-            ? autoPairPlayers(players)
-            : s.tournament.teams;
+          const { doublesPairing, teams } = doublesStateForPlayers(
+            s.tournament.mode,
+            s.tournament.doublesPairing,
+            players,
+          );
           return {
             tournament: {
               ...s.tournament,
               players,
+              doublesPairing,
               teams,
               matches: [],
               groups: [],
@@ -356,9 +383,11 @@ export const useTournamentStore = create<TournamentState>()(
         const idSet = new Set(ids);
         set((s) => {
           const players = s.tournament.players.filter((p) => !idSet.has(p.id));
-          const teams = shouldMaintainFixedTeams(s.tournament)
-            ? autoPairPlayers(players)
-            : [];
+          const { doublesPairing, teams } = doublesStateForPlayers(
+            s.tournament.mode,
+            s.tournament.doublesPairing,
+            players,
+          );
           const matches = s.tournament.matches.filter(
             (m) =>
               !m.sideAIds.some((pid) => idSet.has(pid)) &&
@@ -368,6 +397,7 @@ export const useTournamentStore = create<TournamentState>()(
             tournament: {
               ...s.tournament,
               players,
+              doublesPairing,
               teams,
               matches,
               groups: [],
@@ -393,9 +423,11 @@ export const useTournamentStore = create<TournamentState>()(
       removePlayer: (id) =>
         set((s) => {
           const players = s.tournament.players.filter((p) => p.id !== id);
-          const teams = shouldMaintainFixedTeams(s.tournament)
-            ? autoPairPlayers(players)
-            : [];
+          const { doublesPairing, teams } = doublesStateForPlayers(
+            s.tournament.mode,
+            s.tournament.doublesPairing,
+            players,
+          );
           const matches = s.tournament.matches.filter(
             (m) =>
               !m.sideAIds.includes(id) && !m.sideBIds.includes(id),
@@ -404,6 +436,7 @@ export const useTournamentStore = create<TournamentState>()(
             tournament: {
               ...s.tournament,
               players,
+              doublesPairing,
               teams,
               matches,
               groups: [],

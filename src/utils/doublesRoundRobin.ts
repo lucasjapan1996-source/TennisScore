@@ -146,6 +146,7 @@ export function orderDoublesMatchesSequentialFirst(
 
 export function countDoublesPartnerRoundMatches(playerCount: number): number {
   if (playerCount < 4) return 0;
+  if (playerCount >= 5 && playerCount % 4 === 1) return playerCount;
   const ids = Array.from({ length: playerCount }, (_, i) => `p${i + 1}`);
   return selectPartnerRoundMatches(ids).length;
 }

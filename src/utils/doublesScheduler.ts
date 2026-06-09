@@ -3,6 +3,7 @@
  */
 
 import type { ScheduleSeedMode } from '../types';
+import { orderByRestAndFairness } from './matchOrder';
 import type { DoublesMatchup } from './doublesRoundRobin';
 import {
   allDoublesMatchups,
@@ -126,6 +127,50 @@ export function buildSequentialDoublesWaves(
     });
   }
   return waves;
+}
+
+/** n≡1(mod 4) 时每场仅 1 人休息，共 n 场，每人上场 n−1 次 */
+export function isOneByeRotatingDoublesCount(playerCount: number): boolean {
+  return playerCount >= 5 && playerCount % 4 === 1;
+}
+
+/**
+ * 奇数轮换顺序波次：前四人先打、末位休息；再在前列球员中轮流休息。
+ * 每场在场四人按签位相邻搭档 1/2 vs 3/4（5 人 → 12vs34，再 2345、1345…）。
+ */
+export function buildSequentialOneByeRotatingDoublesWaves(
+  playerIds: readonly string[],
+): DoublesMatchup[] {
+  const n = playerIds.length;
+  if (!isOneByeRotatingDoublesCount(n)) return [];
+
+  const matches: DoublesMatchup[] = [];
+  for (let round = 0; round < n; round++) {
+    const active =
+      round === 0
+        ? playerIds.slice(0, 4)
+        : playerIds.filter((_, i) => i !== round - 1);
+    if (active.length !== 4) continue;
+    matches.push({
+      sideA: [active[0]!, active[1]!],
+      sideB: [active[2]!, active[3]!],
+    });
+  }
+  return matches;
+}
+
+/** 单场休息轮换：首场固定，其余按休息与公平性排序 */
+export function scheduleSequentialOneByeRotatingDoubles(
+  playerIds: readonly string[],
+): DoublesMatchup[] {
+  const waves = buildSequentialOneByeRotatingDoublesWaves(playerIds);
+  if (waves.length <= 1) return [...waves];
+  const [first, ...rest] = waves;
+  const orderedRest = orderByRestAndFairness(rest, (m) => [
+    ...m.sideA,
+    ...m.sideB,
+  ]);
+  return [first, ...orderedRest];
 }
 
 const waveKeySetCache = new WeakMap<readonly string[], Set<string>>();
@@ -464,29 +509,26 @@ export type RotatingDoublesScheduleOptions = {
   expandPool?: boolean;
 };
 
+/**
+ * 轮换双打时间线。`playerIds` 须已由 `orderEntities` 按签位排好序
+ *（顺序 = 列表顺序，随机 = 已打乱），与单打排程入口一致。
+ */
 export function buildRotatingDoublesSchedule(
   playerIds: readonly string[],
   seedMode: ScheduleSeedMode,
   options: RotatingDoublesScheduleOptions = {},
 ): DoublesMatchup[] {
   if (playerIds.length < 4) return [];
-  const ordered =
-    seedMode === 'random'
-      ? shuffleIds([...playerIds])
-      : [...playerIds];
+  const ordered = [...playerIds];
+
+  if (isOneByeRotatingDoublesCount(ordered.length)) {
+    return scheduleSequentialOneByeRotatingDoubles(ordered);
+  }
+
   const pool = options.expandPool
     ? buildDoublesCandidatePool(ordered)
     : selectPartnerRoundMatches([...ordered]);
   return scheduleDoublesByRounds(pool, ordered, seedMode).timeline;
-}
-
-function shuffleIds(ids: string[]): string[] {
-  const a = [...ids];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
 }
 
 export type DoublesScheduleQuality = {

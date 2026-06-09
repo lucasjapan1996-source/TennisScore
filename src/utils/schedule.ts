@@ -47,6 +47,34 @@ export function orderEntities<T>(entities: T[], seedMode: ScheduleSeedMode): T[]
   return seedMode === 'random' ? shuffle(entities) : [...entities];
 }
 
+/** 固定双打编组要求偶数球员 */
+export function isFixedDoublesPairingAllowed(playerCount: number): boolean {
+  return playerCount >= 2 && playerCount % 2 === 0;
+}
+
+/** 奇数球员时强制轮换搭档 */
+export function normalizeDoublesPairingForPlayers(
+  mode: MatchMode,
+  pairing: DoublesPairing,
+  playerCount: number,
+): DoublesPairing {
+  if (mode !== 'doubles') return pairing;
+  if (pairing === 'fixed' && !isFixedDoublesPairingAllowed(playerCount)) {
+    return 'rotating';
+  }
+  return pairing;
+}
+
+/** 双打排程/分组用的实体数量 */
+export function doublesScheduleEntityCount(
+  playerCount: number,
+  teams: Team[],
+  doublesPairing: DoublesPairing,
+): number {
+  if (doublesPairing === 'rotating') return playerCount;
+  return teams.length;
+}
+
 function emptyGroupMatch(
   group: number,
   order: number,
@@ -228,13 +256,65 @@ export function buildRoundRobinSchedule(
   return { matches, groups: [] };
 }
 
+function buildGroupStageRotatingDoublesSchedule(
+  players: Player[],
+  groupCount: number,
+  seedMode: ScheduleSeedMode,
+): ScheduleResult {
+  const groups = assignGroups(players, groupCount, (p) => p.id, seedMode);
+  const matches: Match[] = [];
+  let order = 1;
+
+  if (seedMode === 'sequential') {
+    for (const g of groups) {
+      const members = g.memberIds
+        .map((id) => players.find((p) => p.id === id))
+        .filter((p): p is Player => !!p);
+      if (members.length < 4) continue;
+      const ordered = orderEntities(members, seedMode);
+      const batch = buildDoublesPartnerRoundRobinMatches(
+        ordered.map((p) => p.id),
+        (o, sideAIds, sideBIds) => emptyGroupMatch(g.id, o, sideAIds, sideBIds),
+        order,
+        seedMode,
+      );
+      matches.push(...batch);
+      order += batch.length;
+    }
+  } else {
+    for (const g of groups) {
+      const members = g.memberIds
+        .map((id) => players.find((p) => p.id === id))
+        .filter((p): p is Player => !!p);
+      if (members.length < 4) continue;
+      const ordered = orderEntities(members, seedMode);
+      const batch = buildDoublesPartnerRoundRobinMatches(
+        ordered.map((p) => p.id),
+        (o, sideAIds, sideBIds) => emptyGroupMatch(g.id, o, sideAIds, sideBIds),
+        order,
+        seedMode,
+      );
+      matches.push(...batch);
+      order += batch.length;
+    }
+  }
+
+  const knockout = buildKnockoutMatches(groups, order, seedMode);
+  matches.push(...knockout.matches);
+  return { matches, groups };
+}
+
 export function buildGroupStageSchedule(
   players: Player[],
   teams: Team[],
   mode: MatchMode,
   groupCount: number,
   seedMode: ScheduleSeedMode = 'random',
+  doublesPairing: DoublesPairing = 'fixed',
 ): ScheduleResult {
+  if (mode === 'doubles' && doublesPairing === 'rotating') {
+    return buildGroupStageRotatingDoublesSchedule(players, groupCount, seedMode);
+  }
   if (mode === 'singles') {
     const groups = assignGroups(players, groupCount, (p) => p.id, seedMode);
     const matches: Match[] = [];
@@ -546,22 +626,43 @@ export function validateBeforeSchedule(
 ): string | null {
   if (players.length < 2) return getActiveStrings().errMinPlayers;
   if (mode === 'doubles') {
-    if (players.length % 2 !== 0) return getActiveStrings().errDoublesEven;
-    if (doublesPairing === 'rotating') {
-      if (scheduleFormat === 'round_robin' && players.length < 4) {
-        return getActiveStrings().errDoublesPartnerMin;
-      }
-      if (scheduleFormat !== 'round_robin' && players.length < 4) {
-        return getActiveStrings().errDoublesPartnerMin;
+    if (
+      doublesPairing === 'fixed' &&
+      !isFixedDoublesPairingAllowed(players.length)
+    ) {
+      return getActiveStrings().errDoublesOddFixed;
+    }
+    const pairing = normalizeDoublesPairingForPlayers(
+      mode,
+      doublesPairing,
+      players.length,
+    );
+    if (pairing === 'rotating') {
+      if (players.length < 4) return getActiveStrings().errDoublesPartnerMin;
+      if (
+        scheduleFormat === 'knockout' &&
+        players.length % 2 !== 0
+      ) {
+        return getActiveStrings().errDoublesEven;
       }
     } else {
+      if (!isFixedDoublesPairingAllowed(players.length)) {
+        return getActiveStrings().errDoublesOddFixed;
+      }
       if (teams.length < 2) return getActiveStrings().errMinTeams;
       const used = new Set(teams.flatMap((t) => t.playerIds));
       if (used.size !== players.length) return getActiveStrings().errTeamCoverage;
     }
   }
   if (scheduleFormat === 'group_stage') {
-    const entityCount = mode === 'singles' ? players.length : teams.length;
+    const entityCount =
+      mode === 'singles'
+        ? players.length
+        : doublesScheduleEntityCount(
+            players.length,
+            teams,
+            normalizeDoublesPairingForPlayers(mode, doublesPairing, players.length),
+          );
     if (groupCount < 2) return getActiveStrings().errMinGroups;
     if (groupCount > entityCount) return getActiveStrings().errGroupsTooMany;
     const minPerGroup = Math.floor(entityCount / groupCount);
@@ -570,7 +671,14 @@ export function validateBeforeSchedule(
     }
   }
   if (scheduleFormat === 'knockout' || scheduleFormat === 'group_stage') {
-    const entityCount = mode === 'singles' ? players.length : teams.length;
+    const entityCount =
+      mode === 'singles'
+        ? players.length
+        : doublesScheduleEntityCount(
+            players.length,
+            teams,
+            normalizeDoublesPairingForPlayers(mode, doublesPairing, players.length),
+          );
     const bracketSize =
       scheduleFormat === 'knockout'
         ? initialKnockoutBracketSize(entityCount)
@@ -611,6 +719,7 @@ export function buildScheduleFromSettings(
       mode,
       groupCount,
       seedMode,
+      doublesPairing,
     );
   }
   if (scheduleFormat === 'knockout') {

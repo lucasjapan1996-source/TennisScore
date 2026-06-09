@@ -77,6 +77,8 @@ export interface Strings {
   doublesPairingFixedTitle: string;
   doublesPairingRotating: string;
   doublesPairingRotatingTitle: string;
+  doublesPairingFixedDisabledOdd: string;
+  errDoublesOddFixed: string;
   teamGroupTitle: string;
   teamGroup: string;
   teamGroupHint: string;
