@@ -38,6 +38,7 @@ function baseTournament(matches: Match[], players: Player[] = PLAYERS): Tourname
     doublesPairing: 'fixed',
     scheduleFormat: 'knockout',
     scheduleSeedMode: 'sequential',
+    courtCount: 1,
     bestOfMode: 'uniform',
     bestOf: 3,
     customBestOfDefault: 3,

@@ -19,6 +19,8 @@ export type PlayerScheduleState = {
   orderIndex: number;
   matchCount: number;
   lastSlot: number;
+  /** 当前连续上场次数（含本场） */
+  consecutiveRun: number;
 };
 
 /** 全局排程状态 */
@@ -40,6 +42,7 @@ export const SOFT_WEIGHTS = {
   restMin: 42,
   restMax: 14,
   backToBack: 75,
+  streak: 55,
   shortRest: 18,
   teammate: 28,
   opponent: 18,
@@ -67,6 +70,7 @@ export function createDoublesScheduleState(
       orderIndex: index,
       matchCount: 0,
       lastSlot: -1,
+      consecutiveRun: 0,
     });
   });
   return {
@@ -100,6 +104,11 @@ export function applyMatchToScheduleState(
   for (const id of participantsOf(m)) {
     const p = state.players.get(id);
     if (!p) continue;
+    if (p.lastSlot === slot - 1) {
+      p.consecutiveRun++;
+    } else {
+      p.consecutiveRun = 1;
+    }
     p.matchCount++;
     p.lastSlot = slot;
   }
@@ -159,17 +168,26 @@ export function buildSequentialOneByeRotatingDoublesWaves(
   return matches;
 }
 
-/** 单场休息轮换：首场固定，其余按休息与公平性排序 */
+/** 单场休息轮换：首场固定，其余按休息与公平性排序（承接首场状态） */
 export function scheduleSequentialOneByeRotatingDoubles(
   playerIds: readonly string[],
 ): DoublesMatchup[] {
   const waves = buildSequentialOneByeRotatingDoublesWaves(playerIds);
   if (waves.length <= 1) return [...waves];
   const [first, ...rest] = waves;
-  const orderedRest = orderByRestAndFairness(rest, (m) => [
-    ...m.sideA,
-    ...m.sideB,
-  ]);
+  const lastSlot = new Map<string, number>();
+  const playCount = new Map<string, number>();
+  const consecutiveRun = new Map<string, number>();
+  for (const id of [...first.sideA, ...first.sideB]) {
+    lastSlot.set(id, 0);
+    playCount.set(id, 1);
+    consecutiveRun.set(id, 1);
+  }
+  const orderedRest = orderByRestAndFairness(
+    rest,
+    (m) => [...m.sideA, ...m.sideB],
+    { lastSlot, playCount, consecutiveRun, slot: 1 },
+  );
   return [first, ...orderedRest];
 }
 
@@ -237,6 +255,7 @@ export function scoreDoublesMatchDetailed(
   let maxRest = 0;
   let backToBackPlayers = 0;
   let shortRestPlayers = 0;
+  let streakPenalty = 0;
 
   for (const id of ids) {
     const p = state.players.get(id);
@@ -246,8 +265,11 @@ export function scoreDoublesMatchDetailed(
       maxRest = Math.max(maxRest, slot + 3);
     } else {
       const gap = slot - p.lastSlot;
-      if (gap <= 1) backToBackPlayers++;
-      else if (gap === 2) shortRestPlayers++;
+      if (gap <= 1) {
+        backToBackPlayers++;
+        const run = p.consecutiveRun;
+        streakPenalty += SOFT_WEIGHTS.streak * run * run;
+      } else if (gap === 2) shortRestPlayers++;
       minRest = Math.min(minRest, gap);
       maxRest = Math.max(maxRest, gap);
     }
@@ -302,6 +324,7 @@ export function scoreDoublesMatchDetailed(
     matchCountPenalty -
     backToBackPenalty -
     shortRestPenalty -
+    streakPenalty -
     teammatePenalty -
     opponentPenalty;
 
@@ -505,6 +528,45 @@ export function scheduleDoublesByRounds(
   };
 }
 
+/** 顺序模式：固定相邻四人波次后，其余按休息软约束排序 */
+export function scheduleSequentialDoublesWithSoftRest(
+  candidates: readonly DoublesMatchup[],
+  playerIds: readonly string[],
+): DoublesMatchup[] {
+  const prefix = sequentialPrefixMatchups(playerIds, candidates);
+  const used = new Set(prefix.map(matchupKey));
+  const rest = candidates.filter((m) => !used.has(matchupKey(m)));
+  if (prefix.length === 0) {
+    return orderByRestAndFairness(candidates, (m) => [...m.sideA, ...m.sideB]);
+  }
+  if (rest.length === 0) return [...prefix];
+
+  const lastSlot = new Map<string, number>();
+  const playCount = new Map<string, number>();
+  const consecutiveRun = new Map<string, number>();
+  let slot = 0;
+  for (const m of prefix) {
+    for (const id of participantsOf(m)) {
+      const prev = lastSlot.get(id);
+      if (prev === slot - 1) {
+        consecutiveRun.set(id, (consecutiveRun.get(id) ?? 1) + 1);
+      } else {
+        consecutiveRun.set(id, 1);
+      }
+      lastSlot.set(id, slot);
+      playCount.set(id, (playCount.get(id) ?? 0) + 1);
+    }
+    slot++;
+  }
+
+  const orderedRest = orderByRestAndFairness(
+    rest,
+    (m) => [...m.sideA, ...m.sideB],
+    { lastSlot, playCount, consecutiveRun, slot },
+  );
+  return [...prefix, ...orderedRest];
+}
+
 export type RotatingDoublesScheduleOptions = {
   expandPool?: boolean;
 };
@@ -521,13 +583,17 @@ export function buildRotatingDoublesSchedule(
   if (playerIds.length < 4) return [];
   const ordered = [...playerIds];
 
-  if (isOneByeRotatingDoublesCount(ordered.length)) {
-    return scheduleSequentialOneByeRotatingDoubles(ordered);
-  }
-
   const pool = options.expandPool
     ? buildDoublesCandidatePool(ordered)
     : selectPartnerRoundMatches([...ordered]);
+
+  if (seedMode === 'sequential') {
+    if (isOneByeRotatingDoublesCount(ordered.length)) {
+      return scheduleSequentialOneByeRotatingDoubles(ordered);
+    }
+    return scheduleSequentialDoublesWithSoftRest(pool, ordered);
+  }
+
   return scheduleDoublesByRounds(pool, ordered, seedMode).timeline;
 }
 

@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { useTournamentStore } from '../store/useTournamentStore';
 import {
   estimateMatchCount,
+  effectiveCourtCount,
   isFixedDoublesPairingAllowed,
+  maxMeaningfulCourtCount,
 } from '../utils/schedule';
 import { PlayerLabel } from './PlayerLabel';
 import { ScheduleOverview } from './ScheduleOverview';
@@ -54,6 +56,7 @@ export function SetupPanel() {
     setDoublesPairing,
     setScheduleFormat,
     setScheduleSeedMode,
+    setCourtCount,
     setBestOfMode,
     setBestOf,
     setCustomBestOfDefault,
@@ -110,6 +113,24 @@ export function SetupPanel() {
       : isDoublesRotating
         ? tournament.players.length >= 4
         : entityCount >= 2;
+
+  const maxCourtCount = maxMeaningfulCourtCount(
+    tournament.mode,
+    tournament.players.length,
+    isDoublesFixed ? tournament.teams.length : 0,
+  );
+  const effectiveCourts = effectiveCourtCount(
+    tournament.courtCount,
+    tournament.mode,
+    tournament.players.length,
+    isDoublesFixed ? tournament.teams.length : 0,
+  );
+  const courtCountHint =
+    tournament.courtCount > maxCourtCount
+      ? S.courtCountEffectiveHint(tournament.courtCount, effectiveCourts)
+      : isDoubles && tournament.players.length < 8
+        ? S.courtCountDoublesSmallHint
+        : null;
 
   const isRoundRobin = tournament.scheduleFormat === 'round_robin';
   const hasFinal = tournamentHasFinal(tournament.scheduleFormat);
@@ -443,6 +464,56 @@ export function SetupPanel() {
             </section>
           </div>
         </div>
+        <div className="panel-field-row">
+          <h2 className="panel-field-label" title={S.courtCountTitle}>
+            {S.courtCount}
+          </h2>
+          <div className="panel-field-control">
+            <div
+              className="number-stepper number-stepper--compact"
+              role="group"
+              aria-label={S.courtCount}
+            >
+              <button
+                type="button"
+                className="number-stepper-btn"
+                onClick={() => setCourtCount(tournament.courtCount - 1)}
+                disabled={tournament.courtCount <= 1}
+                title={S.courtCountDecrease}
+                aria-label={S.courtCountDecrease}
+              >
+                −
+              </button>
+              <input
+                type="number"
+                className="number-stepper-input"
+                min={1}
+                max={maxCourtCount}
+                value={tournament.courtCount}
+                onChange={(e) =>
+                  setCourtCount(parseInt(e.target.value, 10) || 1)
+                }
+                title={S.courtCountTitle}
+                aria-label={S.courtCount}
+              />
+              <button
+                type="button"
+                className="number-stepper-btn"
+                onClick={() => setCourtCount(tournament.courtCount + 1)}
+                disabled={tournament.courtCount >= maxCourtCount}
+                title={S.courtCountIncrease}
+                aria-label={S.courtCountIncrease}
+              >
+                +
+              </button>
+            </div>
+            {courtCountHint && (
+              <p className="hint" style={{ margin: '0.35rem 0 0', fontSize: '0.78rem' }}>
+                {courtCountHint}
+              </p>
+            )}
+          </div>
+        </div>
         <p className="btn-row btn-row-actions">
           <button
             type="button"
@@ -481,6 +552,7 @@ export function SetupPanel() {
           groups={tournament.groups}
           matches={tournament.matches}
           scheduleBatchSizes={tournament.scheduleBatchSizes}
+          courtCount={effectiveCourts}
           onAppendSchedule={handleAppendSchedule}
           onToggleMatchStatus={handleToggleMatchStatus}
           onGoScore={() => setActiveTab('matches')}

@@ -1858,6 +1858,99 @@ p.row + p,
   color: var(--muted);
 }
 
+.schedule-court-wave + .schedule-court-wave {
+  border-top: 1px solid var(--border);
+}
+
+.schedule-court-wave-header {
+  display: flex;
+  align-items: center;
+  padding: 0.3rem 0.55rem;
+  background: color-mix(in srgb, var(--surface-2) 88%, var(--accent) 12%);
+  border-bottom: 1px solid var(--border);
+}
+
+.schedule-court-wave-badge {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.field-input-narrow {
+  width: 4.5rem;
+  max-width: 100%;
+}
+
+.number-stepper {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.number-stepper-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.85rem;
+  min-width: 1.85rem;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.number-stepper-btn:hover:not(:disabled) {
+  background: var(--surface);
+  color: var(--accent-hover);
+}
+
+.number-stepper-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.number-stepper-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.number-stepper-input {
+  width: 2rem;
+  min-width: 2rem;
+  max-width: 2rem;
+  padding: 0.28rem 0;
+  margin: 0;
+  border: none;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--surface);
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 600;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.number-stepper-input::-webkit-outer-spin-button,
+.number-stepper-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.number-stepper-input:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
 .schedule-match-list {
   list-style: none;
   margin: 0;

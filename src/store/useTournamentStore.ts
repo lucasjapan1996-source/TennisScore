@@ -21,6 +21,7 @@ import {
   DEFAULT_BEST_OF_MODE,
   DEFAULT_CUSTOM_BEST_OF_DEFAULT,
   DEFAULT_CUSTOM_BEST_OF_FINAL,
+  DEFAULT_COURT_COUNT,
   DEFAULT_DOUBLES_PAIRING,
   DEFAULT_GROUP_COUNT,
   DEFAULT_SCHEDULE_SEED_MODE,
@@ -53,6 +54,7 @@ import {
   appendScheduleMatches,
   buildScheduleFromSettings,
   isFixedDoublesPairingAllowed,
+  maxMeaningfulCourtCount,
   normalizeDoublesPairingForPlayers,
   validateBeforeSchedule,
 } from '../utils/schedule';
@@ -98,6 +100,7 @@ function emptyTournament(): Tournament {
     doublesPairing: DEFAULT_DOUBLES_PAIRING,
     scheduleFormat: 'round_robin',
     scheduleSeedMode: DEFAULT_SCHEDULE_SEED_MODE,
+    courtCount: DEFAULT_COURT_COUNT,
     bestOfMode: DEFAULT_BEST_OF_MODE,
     bestOf: DEFAULT_BEST_OF,
     customBestOfDefault: DEFAULT_CUSTOM_BEST_OF_DEFAULT,
@@ -123,6 +126,7 @@ interface TournamentState {
   setDoublesPairing: (pairing: DoublesPairing) => void;
   setScheduleFormat: (format: ScheduleFormat) => void;
   setScheduleSeedMode: (mode: ScheduleSeedMode) => void;
+  setCourtCount: (count: number) => void;
   setBestOfMode: (mode: BestOfMode) => void;
   setBestOf: (bestOf: BestOf) => void;
   setCustomBestOfDefault: (bestOf: BestOf) => void;
@@ -258,6 +262,27 @@ export const useTournamentStore = create<TournamentState>()(
         set((s) => ({
           tournament: { ...s.tournament, scheduleSeedMode },
         })),
+
+      setCourtCount: (courtCount) =>
+        set((s) => {
+          const { mode, players, teams } = s.tournament;
+          const max = maxMeaningfulCourtCount(
+            mode,
+            players.length,
+            mode === 'doubles' && s.tournament.doublesPairing === 'fixed'
+              ? teams.length
+              : 0,
+          );
+          return {
+            tournament: {
+              ...s.tournament,
+              courtCount: Math.max(1, Math.min(max, courtCount)),
+              matches: [],
+              groups: [],
+              scheduleBatchSizes: [],
+            },
+          };
+        }),
 
       setBestOfMode: (bestOfMode) =>
         set((s) => {
@@ -500,6 +525,7 @@ export const useTournamentStore = create<TournamentState>()(
           tournament.groupCount,
           seedMode,
           tournament.doublesPairing,
+          tournament.courtCount,
         );
         const scheduleTeams =
           tournament.mode === 'doubles' &&
@@ -547,6 +573,7 @@ export const useTournamentStore = create<TournamentState>()(
           tournament.groupCount,
           tournament.scheduleSeedMode,
           tournament.doublesPairing,
+          tournament.courtCount,
         );
         if (appendedCount === 0) {
           return getActiveStrings().errAppendNoMatches;
@@ -766,6 +793,12 @@ export const useTournamentStore = create<TournamentState>()(
               (raw as Tournament).scheduleSeedMode === 'sequential'
                 ? 'sequential'
                 : DEFAULT_SCHEDULE_SEED_MODE,
+            courtCount: (() => {
+              const n = (raw as Tournament).courtCount;
+              return typeof n === 'number' && n >= 1
+                ? Math.min(32, Math.floor(n))
+                : DEFAULT_COURT_COUNT;
+            })(),
             bestOfMode:
               scheduleFormat === 'round_robin'
                 ? 'uniform'
@@ -888,6 +921,10 @@ export const useTournamentStore = create<TournamentState>()(
                     : legacyMark === false
                       ? false
                       : isMatchPlayed(normalized),
+                courtWave:
+                  typeof (legacy as Match).courtWave === 'number'
+                    ? (legacy as Match).courtWave
+                    : null,
               };
               });
             })(),

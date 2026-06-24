@@ -174,6 +174,16 @@ export const jaStrings: Strings = {
   scheduleSeedRandomTitle: 'ランダムにシャッフル（連続出場は避ける）',
   scheduleSeedHintShort: (mode) =>
     mode === 'sequential' ? 'リスト順' : 'ランダム',
+  courtCount: 'コート数',
+  courtCountTitle:
+    '同時使用コート数。各ラウンドはこの試合数まで。ダブルス8人未満は1面が目安。連続出場回避はソフト制約',
+  courtCountDecrease: 'コート数を減らす',
+  courtCountIncrease: 'コート数を増やす',
+  courtCountDoublesSmallHint: 'ダブルス8人未満は1面が目安',
+  courtCountEffectiveHint: (requested, effective) =>
+    `設定 ${requested} 面 → 実際 ${effective} 面で排程`,
+  courtWaveTitle: (wave, matchCount) =>
+    `第 ${wave} ラウンド（${matchCount} 試合）`,
   schedule: '対戦表を生成',
   statPlayers: '選手',
   statPlayersTitle: '登録選手数',

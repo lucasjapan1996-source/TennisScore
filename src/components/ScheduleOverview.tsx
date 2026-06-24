@@ -15,6 +15,7 @@ import type {
 import type { ResolveSidesTournament } from '../utils/knockout';
 import {
   groupMatchesBySection,
+  groupMatchesIntoCourtWaves,
   isMatchScheduleMarkedDone,
   matchPairKey,
   splitMatchesByBatches,
@@ -50,6 +51,7 @@ interface ScheduleOverviewProps {
   groups: GroupAssignment[];
   matches: Match[];
   scheduleBatchSizes?: number[];
+  courtCount?: number;
   onAppendSchedule?: () => void;
   onGoScore?: () => void;
   onToggleMatchStatus?: (matchId: string, played: boolean) => void;
@@ -101,6 +103,7 @@ export function ScheduleOverview({
   groups,
   matches,
   scheduleBatchSizes = [],
+  courtCount = 1,
   onAppendSchedule,
   onGoScore,
   onToggleMatchStatus,
@@ -192,6 +195,49 @@ export function ScheduleOverview({
     (m) => !m.isBye && isMatchScheduleMarkedDone(m),
   ).length;
 
+  const renderMatchRow = (m: Match) => {
+    const resolved = resolveMatchSides(m, resolveCtx, nameLabel);
+    const matchupLine = buildMatchupLine(m);
+    const markedDone = isMatchScheduleMarkedDone(m);
+    const canToggle =
+      !m.isBye &&
+      !!onToggleMatchStatus &&
+      resolved.ready &&
+      resolved.sideAIds.length > 0 &&
+      resolved.sideBIds.length > 0;
+    const stageLabel =
+      m.knockoutStage != null ? knockoutMatchLabel(m) : null;
+    return (
+      <li
+        key={m.id}
+        className={`schedule-match-row${m.isBye ? ' schedule-match-row--bye' : ''}${markedDone ? ' done' : ''}`}
+      >
+        <span
+          className={
+            stageLabel ? 'schedule-match-stage' : 'schedule-match-no'
+          }
+          title={stageLabel ? stageLabel : S.matchNoTitle(m.order)}
+        >
+          {stageLabel ?? m.order}
+        </span>
+        <span
+          className={`schedule-match-line${m.isBye ? ' schedule-match-line--bye' : ''}`}
+          title={matchupLine}
+        >
+          {matchupLine}
+        </span>
+        {!m.isBye && (
+          <ScheduleMatchStatusSwitch
+            played={markedDone}
+            disabled={!canToggle}
+            disabledHint={resolved.waitingReason ?? undefined}
+            onChange={(next) => onToggleMatchStatus?.(m.id, next)}
+          />
+        )}
+      </li>
+    );
+  };
+
   return (
     <CollapsiblePanel
       title={S.fullSchedule}
@@ -261,52 +307,30 @@ export function ScheduleOverview({
                 </span>
               </header>
             )}
-            <ol className="schedule-match-list">
-              {sectionMatches.map((m) => {
-                const resolved = resolveMatchSides(m, resolveCtx, nameLabel);
-                const matchupLine = buildMatchupLine(m);
-                const markedDone = isMatchScheduleMarkedDone(m);
-                const canToggle =
-                  !m.isBye &&
-                  !!onToggleMatchStatus &&
-                  resolved.ready &&
-                  resolved.sideAIds.length > 0 &&
-                  resolved.sideBIds.length > 0;
-                const stageLabel =
-                  m.knockoutStage != null ? knockoutMatchLabel(m) : null;
-                return (
-                  <li
-                    key={m.id}
-                    className={`schedule-match-row${m.isBye ? ' schedule-match-row--bye' : ''}${markedDone ? ' done' : ''}`}
+            {courtCount > 1 ? (
+              groupMatchesIntoCourtWaves(sectionMatches, courtCount).map(
+                (waveMatches, waveIndex) => (
+                  <div
+                    key={waveIndex}
+                    className="schedule-court-wave"
+                    data-wave={waveIndex + 1}
                   >
-                    <span
-                      className={
-                        stageLabel ? 'schedule-match-stage' : 'schedule-match-no'
-                      }
-                      title={
-                        stageLabel ? stageLabel : S.matchNoTitle(m.order)
-                      }
-                    >
-                      {stageLabel ?? m.order}
-                    </span>
-                    <span
-                      className={`schedule-match-line${m.isBye ? ' schedule-match-line--bye' : ''}`}
-                      title={matchupLine}
-                    >
-                      {matchupLine}
-                    </span>
-                    {!m.isBye && (
-                      <ScheduleMatchStatusSwitch
-                        played={markedDone}
-                        disabled={!canToggle}
-                        disabledHint={resolved.waitingReason ?? undefined}
-                        onChange={(next) => onToggleMatchStatus?.(m.id, next)}
-                      />
-                    )}
-                  </li>
-                );
-              })}
-            </ol>
+                    <header className="schedule-court-wave-header">
+                      <span className="schedule-court-wave-badge">
+                        {S.courtWaveTitle(waveIndex + 1, waveMatches.length)}
+                      </span>
+                    </header>
+                    <ol className="schedule-match-list">
+                      {waveMatches.map((m) => renderMatchRow(m))}
+                    </ol>
+                  </div>
+                ),
+              )
+            ) : (
+              <ol className="schedule-match-list">
+                {sectionMatches.map((m) => renderMatchRow(m))}
+              </ol>
+            )}
           </section>
         ))}
       </div>

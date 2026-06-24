@@ -96,6 +96,8 @@ export interface Match {
   isBye: boolean;
   /** 对战表手动标记为完赛（与比分录入无关） */
   scheduleMarkedDone: boolean;
+  /** 多场地排程轮次（从 0 起），生成对阵时写入 */
+  courtWave: number | null;
 }
 
 export interface Tournament {
@@ -110,6 +112,8 @@ export interface Tournament {
   scheduleFormat: ScheduleFormat;
   /** 生成对阵：按球员列表顺序，或随机打乱 */
   scheduleSeedMode: ScheduleSeedMode;
+  /** 同时可用场地数；对阵按轮分组，每轮不超过该场数且同一球员不重复上场 */
+  courtCount: number;
   bestOfMode: BestOfMode;
   /** 统一赛制时使用 */
   bestOf: BestOf;
@@ -150,6 +154,7 @@ export const DEFAULT_PLAYER_LEVEL: PlayerLevel = 3;
 
 export const DEFAULT_GROUP_COUNT = 2;
 export const DEFAULT_SCHEDULE_SEED_MODE: ScheduleSeedMode = 'random';
+export const DEFAULT_COURT_COUNT = 1;
 export const DEFAULT_DOUBLES_PAIRING: DoublesPairing = 'fixed';
 
 export const DEFAULT_BEST_OF: BestOf = 1;

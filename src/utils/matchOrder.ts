@@ -156,19 +156,29 @@ export function analyzeMatchOrder(
   return { playCount, restGaps, hasBackToBack };
 }
 
+export type RestOrderInitialState = {
+  lastSlot: Map<string, number>;
+  playCount: Map<string, number>;
+  consecutiveRun?: Map<string, number>;
+  slot: number;
+};
+
 /**
- * 贪心排程：避免连场，优先让休息最久的球员上场，并兼顾等待过久的一方。
+ * 贪心排程：以软约束尽量减轻连场，优先让休息最久的球员上场。
+ * 无法完全避免连场时仍会选择相对更优的对阵。
  */
 export function orderByRestAndFairness<T>(
   items: readonly T[],
   participants: (item: T) => readonly string[],
+  initial?: RestOrderInitialState,
 ): T[] {
   if (items.length <= 1) return [...items];
 
   const remaining = [...items];
   const ordered: T[] = [];
-  const lastSlot = new Map<string, number>();
-  const playCount = new Map<string, number>();
+  const lastSlot = new Map(initial?.lastSlot ?? []);
+  const playCount = new Map(initial?.playCount ?? []);
+  const consecutiveRun = new Map(initial?.consecutiveRun ?? []);
 
   const score = (ids: readonly string[], slot: number): number => {
     let minGap = Number.POSITIVE_INFINITY;
@@ -176,6 +186,7 @@ export function orderByRestAndFairness<T>(
     let matchCountSum = 0;
     let backToBack = 0;
     let shortRest = 0;
+    let streakPenalty = 0;
 
     for (const id of ids) {
       const played = playCount.get(id) ?? 0;
@@ -186,8 +197,11 @@ export function orderByRestAndFairness<T>(
         maxGap = Math.max(maxGap, slot + 3);
       } else {
         const gap = slot - prev;
-        if (gap <= 1) backToBack++;
-        else if (gap === 2) shortRest++;
+        if (gap <= 1) {
+          backToBack++;
+          const run = consecutiveRun.get(id) ?? 1;
+          streakPenalty += run * run * 55;
+        } else if (gap === 2) shortRest++;
         minGap = Math.min(minGap, gap);
         maxGap = Math.max(maxGap, gap);
       }
@@ -203,11 +217,12 @@ export function orderByRestAndFairness<T>(
       maxGap * 1.2 -
       matchCountSum * 0.35 -
       backToBack * 75 -
-      shortRest * 15
+      shortRest * 15 -
+      streakPenalty
     );
   };
 
-  let slot = 0;
+  let slot = initial?.slot ?? 0;
   while (remaining.length > 0) {
     let pick = 0;
     let best = -Infinity;
@@ -223,12 +238,157 @@ export function orderByRestAndFairness<T>(
     ordered.push(item);
     for (const id of ids) {
       playCount.set(id, (playCount.get(id) ?? 0) + 1);
+      const prev = lastSlot.get(id);
+      if (prev === slot - 1) {
+        consecutiveRun.set(id, (consecutiveRun.get(id) ?? 1) + 1);
+      } else {
+        consecutiveRun.set(id, 1);
+      }
       lastSlot.set(id, slot);
     }
     slot++;
   }
 
   return ordered;
+}
+
+/**
+ * 按场地数分轮打包：每轮最多 courtCount 场，同一参与者不重复出现在同轮。
+ * 保持输入顺序优先（同轮内按原序选取）。
+ */
+export function packItemsByCourtCount<T>(
+  items: readonly T[],
+  courtCount: number,
+  participants: (item: T) => readonly string[],
+): T[] {
+  return scheduleItemsByCourtWaves(items, courtCount, participants, {
+    restAware: false,
+  });
+}
+
+function scoreWaveCandidate(
+  ids: readonly string[],
+  waveIndex: number,
+  lastWave: Map<string, number>,
+  playCount: Map<string, number>,
+): number {
+  let minGap = Number.POSITIVE_INFINITY;
+  let backToBack = 0;
+  let shortRest = 0;
+  let countSum = 0;
+
+  for (const id of ids) {
+    countSum += playCount.get(id) ?? 0;
+    const prev = lastWave.get(id);
+    if (prev === undefined) {
+      minGap = Math.min(minGap, waveIndex + 3);
+    } else {
+      const gap = waveIndex - prev;
+      if (gap <= 1) backToBack++;
+      else if (gap === 2) shortRest++;
+      minGap = Math.min(minGap, gap);
+    }
+  }
+
+  if (!Number.isFinite(minGap)) {
+    minGap = waveIndex + 3;
+  }
+
+  return (
+    minGap * 8 -
+    backToBack * 75 -
+    shortRest * 15 -
+    countSum * 0.35
+  );
+}
+
+/**
+ * 按场地数分轮排程：每轮最多 courtCount 场，同轮不重复参与者；
+ * restAware 时优先让上一轮刚上场的选手休息，便于多场地并行。
+ */
+export function scheduleItemsByCourtWaves<T>(
+  items: readonly T[],
+  courtCount: number,
+  participants: (item: T) => readonly string[],
+  options: { restAware?: boolean } = {},
+): T[] {
+  return scheduleItemsIntoCourtWaves(items, courtCount, participants, options).flat();
+}
+
+export function scheduleItemsIntoCourtWaves<T>(
+  items: readonly T[],
+  courtCount: number,
+  participants: (item: T) => readonly string[],
+  options: { restAware?: boolean } = {},
+): T[][] {
+  const restAware = options.restAware !== false;
+  if (items.length <= 1) return [items.slice()];
+
+  if (courtCount <= 1) {
+    return [items.slice()];
+  }
+
+  const remaining = items.map((item, index) => ({ item, index }));
+  const waves: T[][] = [];
+  const lastWave = new Map<string, number>();
+  const playCount = new Map<string, number>();
+  let waveIndex = 0;
+
+  while (remaining.length > 0) {
+    const wave: T[] = [];
+    const busy = new Set<string>();
+
+    const pickFrom = (candidateIndices: Set<number>) => {
+      let bestIdx = -1;
+      let bestScore = -Infinity;
+      for (const i of candidateIndices) {
+        const entry = remaining[i];
+        if (!entry) continue;
+        const { item, index } = entry;
+        const ids = participants(item);
+        if (ids.some((id) => busy.has(id))) continue;
+
+        const score = restAware
+          ? scoreWaveCandidate(ids, waveIndex, lastWave, playCount) -
+            index * 0.001
+          : -index;
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestIdx = i;
+        }
+      }
+      return bestIdx;
+    };
+
+    const allIndices = () => new Set(remaining.map((_, index) => index));
+
+    while (wave.length < courtCount) {
+      const bestIdx = pickFrom(allIndices());
+      if (bestIdx < 0) break;
+
+      const [picked] = remaining.splice(bestIdx, 1);
+      wave.push(picked.item);
+      for (const id of participants(picked.item)) busy.add(id);
+    }
+
+    if (wave.length === 0) {
+      if (remaining.length === 0) break;
+      const [picked] = remaining.splice(0, 1)!;
+      wave.push(picked.item);
+    }
+
+    waves.push(wave);
+    for (const item of wave) {
+      for (const id of participants(item)) {
+        lastWave.set(id, waveIndex);
+        playCount.set(id, (playCount.get(id) ?? 0) + 1);
+      }
+    }
+    waveIndex++;
+  }
+
+  return waves;
 }
 
 /** @deprecated 使用圈赛或 orderByRestAndFairness */

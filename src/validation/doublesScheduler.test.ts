@@ -117,6 +117,30 @@ describe('doublesScheduler soft constraints', () => {
     expect(q.backToBackCount).toBeLessThan(18);
   });
 
+  it('7 players sequential: avoid long consecutive runs (soft)', () => {
+    const ids = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7'];
+    const timeline = buildRotatingDoublesSchedule(ids, 'sequential');
+    expect(timeline).toHaveLength(11);
+    expect(matchupKey(timeline[0]!)).toBe('p1,p2|p3,p4');
+
+    let p4Run = 0;
+    let p4MaxRun = 0;
+    for (const m of timeline) {
+      const inMatch = [...m.sideA, ...m.sideB].includes('p4');
+      if (inMatch) {
+        p4Run++;
+        p4MaxRun = Math.max(p4MaxRun, p4Run);
+      } else {
+        p4Run = 0;
+      }
+    }
+    expect(p4MaxRun).toBeLessThanOrEqual(2);
+
+    const q = evaluateScheduleQuality(timeline, ids);
+    expect(q.matchCountSpread).toBeLessThanOrEqual(1);
+    expect(q.averageRestGap).toBeGreaterThan(1);
+  });
+
   it('integration: UI line format for 8 players', () => {
     const players = mockPlayers(8);
     const { matches } = buildRoundRobinSchedule(

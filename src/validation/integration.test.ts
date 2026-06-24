@@ -48,6 +48,7 @@ function baseTournament(overrides: Partial<Tournament> = {}): Tournament {
     doublesPairing: 'fixed',
     scheduleFormat: 'round_robin',
     scheduleSeedMode: 'sequential',
+    courtCount: 1,
     bestOfMode: 'uniform',
     bestOf: 3,
     customBestOfDefault: 3,
@@ -267,6 +268,7 @@ describe('best of / round robin', () => {
       slotB: null,
       isBye: false,
       scheduleMarkedDone: false,
+      courtWave: null,
     };
     expect(resolveMatchBestOf(m, t)).toBe(1);
     expect(tournamentHasFinal('round_robin')).toBe(false);
@@ -300,6 +302,7 @@ describe('best of / round robin', () => {
       slotB: null,
       isBye: false,
       scheduleMarkedDone: false,
+      courtWave: null,
     };
     const final: Match = {
       ...semi,

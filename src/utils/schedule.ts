@@ -27,6 +27,7 @@ import {
   buildTeamMatchOrderWithSequentialFirst,
   interleaveRoundRobinRounds,
   orderByRestAndFairness,
+  scheduleItemsIntoCourtWaves,
 } from './matchOrder';
 import { scheduleSinglesTimeline } from './singlesScheduler';
 
@@ -102,6 +103,7 @@ function emptyGroupMatch(
     playedAt: null,
     isBye: false,
     scheduleMarkedDone: false,
+    courtWave: null,
   };
 }
 
@@ -131,6 +133,7 @@ function emptyRoundRobinMatch(
     playedAt: null,
     isBye: false,
     scheduleMarkedDone: false,
+    courtWave: null,
   };
 }
 
@@ -505,6 +508,189 @@ export function groupMatchesBySection(
   return map;
 }
 
+function matchParticipantIds(m: Match): string[] {
+  return [...m.sideAIds, ...m.sideBIds];
+}
+
+/** 按人数与模式，同时开打的场地数上限（实际意义） */
+export function maxMeaningfulCourtCount(
+  mode: MatchMode,
+  playerCount: number,
+  teamCount = 0,
+): number {
+  if (playerCount < 2) return 1;
+  if (mode === 'doubles') {
+    if (playerCount < 8) return 1;
+    if (teamCount >= 2) {
+      return Math.max(1, Math.floor(teamCount / 2));
+    }
+    return Math.max(1, Math.floor(playerCount / 4));
+  }
+  return Math.max(1, Math.floor(playerCount / 2));
+}
+
+/** 用户设定与上限取小；生成对阵时使用 */
+export function effectiveCourtCount(
+  requested: number,
+  mode: MatchMode,
+  playerCount: number,
+  teamCount = 0,
+): number {
+  const max = maxMeaningfulCourtCount(mode, playerCount, teamCount);
+  return Math.max(1, Math.min(max, Math.floor(requested) || 1));
+}
+
+/** 按赛段/小组/淘汰轮次切分，便于在各段内按场地分轮 */
+function splitMatchesForCourtReorder(matches: Match[]): Match[][] {
+  const sorted = [...matches].sort((a, b) => a.order - b.order);
+  const units: Match[][] = [];
+  let current: Match[] = [];
+  let currentKey: string | null = null;
+
+  for (const m of sorted) {
+    const unitKey =
+      m.phase === 'knockout'
+        ? `ko:${m.knockoutRound ?? 0}`
+        : m.group === null
+          ? 'all'
+          : `g:${m.group}`;
+
+    if (currentKey !== null && unitKey !== currentKey) {
+      units.push(current);
+      current = [];
+    }
+    currentKey = unitKey;
+    current.push(m);
+  }
+  if (current.length > 0) units.push(current);
+  return units;
+}
+
+function packUnitByCourts(
+  unit: Match[],
+  courtCount: number,
+): Match[][] {
+  const sorted = [...unit].sort((a, b) => a.order - b.order);
+  // 单面场：保持生成器顺序（休息已在排程阶段以软约束处理）
+  if (courtCount <= 1) return [sorted];
+  return scheduleItemsIntoCourtWaves(sorted, courtCount, matchParticipantIds, {
+    restAware: true,
+  });
+}
+
+/** 按场地数分轮重排对阵序号（同段内每轮最多 courtCount 场，同一球员不重复） */
+export function reorderMatchesByCourtCount(
+  matches: Match[],
+  courtCount: number,
+  startWave = 0,
+  options?: {
+    mode?: MatchMode;
+    playerCount?: number;
+    teamCount?: number;
+  },
+): Match[] {
+  const effective =
+    options?.mode != null && options.playerCount != null
+      ? effectiveCourtCount(
+          courtCount,
+          options.mode,
+          options.playerCount,
+          options.teamCount ?? 0,
+        )
+      : Math.max(1, courtCount);
+
+  if (matches.length === 0) return matches;
+
+  const minOrder = Math.min(...matches.map((m) => m.order));
+  let waveNo = startWave;
+  const packed: Match[] = [];
+
+  for (const unitWaves of splitMatchesForCourtReorder(matches).map((unit) =>
+    packUnitByCourts(unit, effective),
+  )) {
+    for (const wave of unitWaves) {
+      for (const m of wave) {
+        packed.push({
+          ...m,
+          courtWave: effective > 1 ? waveNo : null,
+        });
+      }
+      if (effective > 1) waveNo++;
+    }
+  }
+
+  return packed.map((m, i) => ({ ...m, order: minOrder + i }));
+}
+
+/** 将已排序对阵切分为场地轮次（用于展示分组） */
+export function groupMatchesIntoCourtWaves(
+  matches: Match[],
+  courtCount: number,
+): Match[][] {
+  if (courtCount <= 1 || matches.length === 0) return [matches];
+
+  if (matches.some((m) => m.courtWave != null)) {
+    const sorted = [...matches].sort((a, b) => a.order - b.order);
+    const waves: Match[][] = [];
+    let currentWave: number | null = null;
+    let wave: Match[] = [];
+    for (const m of sorted) {
+      const w = m.courtWave ?? 0;
+      if (currentWave !== null && w !== currentWave) {
+        waves.push(wave);
+        wave = [];
+      }
+      currentWave = w;
+      wave.push(m);
+    }
+    if (wave.length > 0) waves.push(wave);
+    return waves;
+  }
+
+  const sorted = [...matches].sort((a, b) => a.order - b.order);
+  const waves: Match[][] = [];
+  let wave: Match[] = [];
+  const busy = new Set<string>();
+
+  for (const m of sorted) {
+    const ids = matchParticipantIds(m);
+    const conflict = ids.some((id) => busy.has(id));
+    if (wave.length > 0 && (conflict || wave.length >= courtCount)) {
+      waves.push(wave);
+      wave = [];
+      busy.clear();
+    }
+    wave.push(m);
+    for (const id of ids) busy.add(id);
+  }
+  if (wave.length > 0) waves.push(wave);
+  return waves;
+}
+
+/** 统计选手在相邻两轮连续上场次数（用于多场地排程质量） */
+export function countConsecutiveCourtWaveAppearances(
+  waves: readonly { sideAIds: string[]; sideBIds: string[] }[][],
+): number {
+  const lastWave = new Map<string, number>();
+  let count = 0;
+
+  waves.forEach((wave, waveIndex) => {
+    const inWave = new Set<string>();
+    for (const m of wave) {
+      for (const id of [...m.sideAIds, ...m.sideBIds]) {
+        inWave.add(id);
+      }
+    }
+    for (const id of inWave) {
+      const prev = lastWave.get(id);
+      if (prev !== undefined && prev === waveIndex - 1) count++;
+      lastWave.set(id, waveIndex);
+    }
+  });
+
+  return count;
+}
+
 /** 按 scheduleBatchSizes 切分对阵批次（用于多块对阵矩阵） */
 export function splitMatchesByBatches(
   matches: Match[],
@@ -707,13 +893,15 @@ export function buildScheduleFromSettings(
   groupCount: number,
   seedMode: ScheduleSeedMode,
   doublesPairing: DoublesPairing,
+  courtCount = 1,
 ): ScheduleResult {
   const scheduleTeams =
     mode === 'doubles' && doublesPairing === 'rotating'
       ? buildDoublesTeamsFromPlayers(players, seedMode)
       : teams;
+  let result: ScheduleResult;
   if (scheduleFormat === 'group_stage') {
-    return buildGroupStageSchedule(
+    result = buildGroupStageSchedule(
       players,
       scheduleTeams,
       mode,
@@ -721,22 +909,30 @@ export function buildScheduleFromSettings(
       seedMode,
       doublesPairing,
     );
-  }
-  if (scheduleFormat === 'knockout') {
-    return buildKnockoutOnlySchedule(
+  } else if (scheduleFormat === 'knockout') {
+    result = buildKnockoutOnlySchedule(
       players,
       scheduleTeams,
       mode,
       seedMode,
     );
+  } else {
+    result = buildRoundRobinSchedule(
+      players,
+      scheduleTeams,
+      mode,
+      seedMode,
+      doublesPairing,
+    );
   }
-  return buildRoundRobinSchedule(
-    players,
-    scheduleTeams,
-    mode,
-    seedMode,
-    doublesPairing,
-  );
+  return {
+    ...result,
+    matches: reorderMatchesByCourtCount(result.matches, courtCount, 0, {
+      mode,
+      playerCount: players.length,
+      teamCount: scheduleTeams.length,
+    }),
+  };
 }
 
 /** 在现有对阵后追加一批（同规则完整生成，场次序号续编） */
@@ -749,6 +945,7 @@ export function appendScheduleMatches(
   groupCount: number,
   seedMode: ScheduleSeedMode,
   doublesPairing: DoublesPairing,
+  courtCount = 1,
 ): { matches: Match[]; groups: GroupAssignment[]; appendedCount: number } {
   const batch = buildScheduleFromSettings(
     players,
@@ -758,15 +955,25 @@ export function appendScheduleMatches(
     groupCount,
     seedMode,
     doublesPairing,
+    courtCount,
   );
   const maxOrder = existingMatches.reduce(
     (max, m) => Math.max(max, m.order),
     0,
   );
+  const maxWave = existingMatches.reduce(
+    (max, m) => Math.max(max, m.courtWave ?? -1),
+    -1,
+  );
+  const waveOffset = maxWave + 1;
   const appended = batch.matches.map((m, i) => ({
     ...m,
     id: uid(),
     order: maxOrder + i + 1,
+    courtWave:
+      m.courtWave != null && courtCount > 1
+        ? m.courtWave + waveOffset
+        : m.courtWave,
   }));
   return {
     matches: [...existingMatches, ...appended],

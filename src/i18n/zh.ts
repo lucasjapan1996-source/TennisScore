@@ -176,6 +176,16 @@ export const zhStrings: Strings = {  defaultTournamentName: '我的赛事',
   scheduleSeedRandomTitle: '随机打乱签位与分组，并尽量避免同一选手连场',
   scheduleSeedHintShort: (mode) =>
     mode === 'sequential' ? '按列表顺序' : '随机打乱',
+  courtCount: '场地数',
+  courtCountTitle:
+    '同时可使用的场地数；对阵按轮分组，每轮不超过该场数。双打不足 8 人通常仅 1 面场；避免连场为尽量安排，非强制',
+  courtCountDecrease: '减少场地数',
+  courtCountIncrease: '增加场地数',
+  courtCountDoublesSmallHint: '双打不足 8 人，建议单面场地',
+  courtCountEffectiveHint: (requested, effective) =>
+    `已设 ${requested} 面，实际按 ${effective} 面排程`,
+  courtWaveTitle: (wave, matchCount) =>
+    `第 ${wave} 轮（${matchCount} 场）`,
   schedule: '生成对阵表',
   statPlayers: '球员',
   statPlayersTitle: '当前已添加的球员总数',

@@ -152,6 +152,13 @@ export interface Strings {
   scheduleSeedRandom: string;
   scheduleSeedRandomTitle: string;
   scheduleSeedHintShort: (mode: 'sequential' | 'random') => string;
+  courtCount: string;
+  courtCountTitle: string;
+  courtCountDecrease: string;
+  courtCountIncrease: string;
+  courtCountDoublesSmallHint: string;
+  courtCountEffectiveHint: (requested: number, effective: number) => string;
+  courtWaveTitle: (wave: number, matchCount: number) => string;
   schedule: string;
   statPlayers: string;
   statPlayersTitle: string;

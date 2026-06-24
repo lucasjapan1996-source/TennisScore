@@ -426,6 +426,7 @@ function createKnockoutAdd(matches: Match[], startOrder: number) {
       playedAt: isBye ? new Date().toISOString() : null,
       isBye,
       scheduleMarkedDone: false,
+      courtWave: null,
     };
     matches.push(m);
     return m;
