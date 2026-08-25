@@ -150,6 +150,7 @@ export function applyScheduleMarkAfterScoreUpdate(m: Match): Match {
   return m;
 }
 
+/** 按列表切成连续块（8 人 2 组 → A:1234、B:5678）；余数优先分给靠前的组 */
 export function assignGroups<T>(
   entities: T[],
   groupCount: number,
@@ -157,16 +158,24 @@ export function assignGroups<T>(
   seedMode: ScheduleSeedMode,
 ): GroupAssignment[] {
   const ordered = orderEntities(entities, seedMode);
-  const buckets: T[][] = Array.from({ length: groupCount }, () => []);
-  ordered.forEach((e, i) => {
-    buckets[i % groupCount].push(e);
-  });
-  return buckets
-    .map((members, idx) => ({
-      id: idx + 1,
+  const n = ordered.length;
+  if (n === 0 || groupCount < 1) return [];
+  const count = Math.min(groupCount, n);
+  const base = Math.floor(n / count);
+  const rem = n % count;
+  const groups: GroupAssignment[] = [];
+  let offset = 0;
+  for (let i = 0; i < count; i++) {
+    const size = base + (i < rem ? 1 : 0);
+    const members = ordered.slice(offset, offset + size);
+    offset += size;
+    if (members.length === 0) continue;
+    groups.push({
+      id: i + 1,
       memberIds: members.map((m) => idOf(m)),
-    }))
-    .filter((g) => g.memberIds.length > 0);
+    });
+  }
+  return groups;
 }
 
 /** @deprecated 使用 assignGroups */

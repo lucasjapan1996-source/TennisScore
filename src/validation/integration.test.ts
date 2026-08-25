@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import type { Match, Player, Tournament } from '../types';
 import {
+  assignGroups,
   buildGroupStageSchedule,
   buildKnockoutOnlySchedule,
   appendScheduleMatches,
@@ -177,6 +178,8 @@ describe('schedule formats (simulated)', () => {
       'sequential',
     );
     expect(groups).toHaveLength(2);
+    expect(groups[0]!.memberIds).toEqual(['p1', 'p2', 'p3', 'p4']);
+    expect(groups[1]!.memberIds).toEqual(['p5', 'p6', 'p7', 'p8']);
     const groupMatches = matches.filter((m) => m.phase === 'group');
     expect(groupMatches.length).toBe(12);
     expect(matches.some((m) => m.phase === 'knockout')).toBe(true);
@@ -184,6 +187,13 @@ describe('schedule formats (simulated)', () => {
       groupMatches.length +
         matches.filter((m) => m.phase === 'knockout' && !m.isBye).length,
     );
+  });
+
+  it('sequential groups are contiguous blocks, remainder to earlier groups', () => {
+    const players = mockPlayers(9);
+    const groups = assignGroups(players, 2, (p) => p.id, 'sequential');
+    expect(groups[0]!.memberIds).toEqual(['p1', 'p2', 'p3', 'p4', 'p5']);
+    expect(groups[1]!.memberIds).toEqual(['p6', 'p7', 'p8', 'p9']);
   });
 
   it('doubles fixed teams: 4 players → 1 team match', () => {
